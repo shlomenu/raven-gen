@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 import numpy as np
 from scipy.misc import comb
 
@@ -18,9 +17,14 @@ def sample_rules():
         for j in range(len(RULE_ATTR)):
             idx = np.random.choice(len(RULE_ATTR[j]))
             name_attr_param = RULE_ATTR[j][idx]
-            all_rules_component.append(Rule_Wrapper(name_attr_param[0], name_attr_param[1], name_attr_param[2], component_idx=i))
+            all_rules_component.append(
+                Rule_Wrapper(name_attr_param[0],
+                             name_attr_param[1],
+                             name_attr_param[2],
+                             component_idx=i))
         all_rules.append(all_rules_component)
     return all_rules
+
 
 # pay attention to Position Arithmetic, new entities (resample)
 def sample_attr_avail(rule_groups, row_3_3):
@@ -71,10 +75,10 @@ def sample_attr_avail(rule_groups, row_3_3):
             rule = rule_group[j]
             rule_attr = rule.attr
             min_level = start_node_layout.orig_entity_constraint[rule_attr][0]
-            max_level = start_node_layout.orig_entity_constraint[rule_attr][1] 
+            max_level = start_node_layout.orig_entity_constraint[rule_attr][1]
             if rule.name == "Constant":
                 if uni or rule_group[0].name == "Constant" or \
-                          (rule_group[0].attr == "Position" and 
+                          (rule_group[0].attr == "Position" and
                           (rule_group[0].name == "Progression" or rule_group[0].name == "Distribute_Three")):
                     times = max_level - min_level + 1
                     times = times - 1

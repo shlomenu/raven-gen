@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 # Maximum number of components in a RPM
 MAX_COMPONENTS = 2
 
@@ -41,8 +40,17 @@ ANGLE_VALUES = [-135, -90, -45, 0, 45, 90, 135, 180]
 ANGLE_MIN = 0
 ANGLE_MAX = len(ANGLE_VALUES) - 1
 
-META_TARGET_FORMAT = ["Constant", "Progression", "Arithmetic", "Distribute_Three", "Number", "Position", "Type", "Size", "Color"]
-META_STRUCTURE_FORMAT = ["Singleton", "Left_Right", "Up_Down", "Out_In", "Left", "Right", "Up", "Down", "Out", "In", "Grid", "Center_Single", "Distribute_Four", "Distribute_Nine", "Left_Center_Single", "Right_Center_Single", "Up_Center_Single", "Down_Center_Single", "Out_Center_Single", "In_Center_Single", "In_Distribute_Four"]
+META_TARGET_FORMAT = [
+    "Constant", "Progression", "Arithmetic", "Distribute_Three", "Number",
+    "Position", "Type", "Size", "Color"
+]
+META_STRUCTURE_FORMAT = [
+    "Singleton", "Left_Right", "Up_Down", "Out_In", "Left", "Right", "Up",
+    "Down", "Out", "In", "Grid", "Center_Single", "Distribute_Four",
+    "Distribute_Nine", "Left_Center_Single", "Right_Center_Single",
+    "Up_Center_Single", "Down_Center_Single", "Out_Center_Single",
+    "In_Center_Single", "In_Distribute_Four"
+]
 
 # Rule, Attr, Param
 # The design encodes rule priority order: Number/Position always comes first
@@ -66,21 +74,19 @@ META_STRUCTURE_FORMAT = ["Singleton", "Left_Right", "Up_Down", "Out_In", "Left",
 # Distribute_Three on Color: Three colors through each row
 # Constant on Color: Nothing changes
 # Note that all rules on Type, Size and Color enforce value consistency in a panel
-RULE_ATTR = [[["Progression", "Number", [-2, -1, 1, 2]], 
-              ["Progression", "Position", [-2, -1, 1, 2]], 
+RULE_ATTR = [[["Progression", "Number", [-2, -1, 1, 2]],
+              ["Progression", "Position", [-2, -1, 1, 2]],
               ["Arithmetic", "Number", [1, -1]],
               ["Arithmetic", "Position", [1, -1]],
               ["Distribute_Three", "Number", None],
               ["Distribute_Three", "Position", None],
               ["Constant", "Number/Position", None]],
              [["Progression", "Type", [-2, -1, 1, 2]],
-              ["Distribute_Three", "Type", None], 
-              ["Constant", "Type", None]],
+              ["Distribute_Three", "Type", None], ["Constant", "Type", None]],
              [["Progression", "Size", [-2, -1, 1, 2]],
               ["Arithmetic", "Size", [1, -1]],
-              ["Distribute_Three", "Size", None],
-              ["Constant", "Size", None]],
+              ["Distribute_Three", "Size", None], ["Constant", "Size", None]],
              [["Progression", "Color", [-2, -1, 1, 2]],
               ["Arithmetic", "Color", [1, -1]],
-              ["Distribute_Three", "Color", None],
-              ["Constant", "Color", None]]]
+              ["Distribute_Three", "Color", None], ["Constant", "Color",
+                                                    None]]]

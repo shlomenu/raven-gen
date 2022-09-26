@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 import numpy as np
 
 
@@ -27,11 +26,14 @@ def solve(rule_groups, context, candidates):
             if rule_num_pos.attr == "Number" or rule_num_pos.name == "Arithmetic":
                 regenerate = True
             rule_type = rule_group[1]
-            satisfied[i] += check_entity(rule_type, context, candidate, "Type", regenerate)
+            satisfied[i] += check_entity(rule_type, context, candidate, "Type",
+                                         regenerate)
             rule_size = rule_group[2]
-            satisfied[i] += check_entity(rule_size, context, candidate, "Size", regenerate)
+            satisfied[i] += check_entity(rule_size, context, candidate, "Size",
+                                         regenerate)
             rule_color = rule_group[3]
-            satisfied[i] += check_entity(rule_color, context, candidate, "Color", regenerate)
+            satisfied[i] += check_entity(rule_color, context, candidate,
+                                         "Color", regenerate)
     satisfied = np.array(satisfied)
     answer_set = np.where(satisfied == max(satisfied))[0]
     return np.random.choice(answer_set)
@@ -50,7 +52,8 @@ def check_num_pos(rule_num_pos, context, candidate):
     component_idx = rule_num_pos.component_idx
     row_3_1_layout = context[6].children[0].children[component_idx].children[0]
     row_3_2_layout = context[7].children[0].children[component_idx].children[0]
-    candidate_layout = candidate.children[0].children[component_idx].children[0]
+    candidate_layout = candidate.children[0].children[component_idx].children[
+        0]
     if rule_num_pos.name == "Constant":
         set_row_3_1_pos = set(row_3_1_layout.position.get_value_idx())
         set_row_3_2_pos = set(row_3_2_layout.position.get_value_idx())
@@ -73,7 +76,7 @@ def check_num_pos(rule_num_pos, context, candidate):
             diff = rule_num_pos.value
             if (set((row_3_1_pos + diff) % most_num) == set(row_3_2_pos)) and \
                (set((row_3_2_pos + diff) % most_num) == set(candidate_pos)):
-               ret = 1
+                ret = 1
     elif rule_num_pos.name == "Arithmetic":
         mode = rule_num_pos.value
         if rule_num_pos.attr == "Number":
@@ -88,9 +91,11 @@ def check_num_pos(rule_num_pos, context, candidate):
             row_3_1_pos = row_3_1_layout.position.get_value_idx()
             row_3_2_pos = row_3_2_layout.position.get_value_idx()
             candidate_pos = candidate_layout.position.get_value_idx()
-            if mode > 0 and (set(candidate_pos) == set(row_3_1_pos) | set(row_3_2_pos)):
+            if mode > 0 and (set(candidate_pos)
+                             == set(row_3_1_pos) | set(row_3_2_pos)):
                 ret = 1
-            if mode < 0 and (set(candidate_pos) == set(row_3_1_pos) - set(row_3_2_pos)):
+            if mode < 0 and (set(candidate_pos)
+                             == set(row_3_1_pos) - set(row_3_2_pos)):
                 ret = 1
     else:
         three_values = rule_num_pos.value_levels[2]
@@ -114,7 +119,8 @@ def check_num_pos(rule_num_pos, context, candidate):
 
 
 def check_consistency(candidate, attr, component_idx):
-    candidate_layout = candidate.children[0].children[component_idx].children[0]
+    candidate_layout = candidate.children[0].children[component_idx].children[
+        0]
     entity_0 = candidate_layout.children[0]
     attr_name = attr.lower()
     entity_0_value = getattr(entity_0, attr_name).get_value_level()
@@ -140,7 +146,8 @@ def check_entity(rule, context, candidate, attr, regenerate):
     component_idx = rule.component_idx
     row_3_1_layout = context[6].children[0].children[component_idx].children[0]
     row_3_2_layout = context[7].children[0].children[component_idx].children[0]
-    candidate_layout = candidate.children[0].children[component_idx].children[0]
+    candidate_layout = candidate.children[0].children[component_idx].children[
+        0]
     uni = candidate_layout.uniformity.get_value()
     attr_name = attr.lower()
     if rule.name == "Constant":
@@ -159,8 +166,10 @@ def check_entity(rule, context, candidate, attr, regenerate):
                 else:
                     flag = True
                     for i in range(len(candidate_layout.children)):
-                        if not (getattr(candidate_layout.children[i], attr_name).get_value_level() == 
-                                getattr(row_3_2_layout.children[i], attr_name).get_value_level()):
+                        if not (getattr(candidate_layout.children[i],
+                                        attr_name).get_value_level()
+                                == getattr(row_3_2_layout.children[i],
+                                           attr_name).get_value_level()):
                             flag = False
                             break
                     if flag:
@@ -169,16 +178,22 @@ def check_entity(rule, context, candidate, attr, regenerate):
                 ret = 1
     elif rule.name == "Progression":
         if check_consistency(candidate, attr, component_idx):
-            row_3_1_value = getattr(row_3_1_layout.children[0], attr_name).get_value_level()
-            row_3_2_value = getattr(row_3_2_layout.children[0], attr_name).get_value_level()
-            candidate_value = getattr(candidate_layout.children[0], attr_name).get_value_level()
+            row_3_1_value = getattr(row_3_1_layout.children[0],
+                                    attr_name).get_value_level()
+            row_3_2_value = getattr(row_3_2_layout.children[0],
+                                    attr_name).get_value_level()
+            candidate_value = getattr(candidate_layout.children[0],
+                                      attr_name).get_value_level()
             if row_3_2_value * 2 == row_3_1_value + candidate_value:
                 ret = 1
     elif rule.name == "Arithmetic":
         if check_consistency(candidate, attr, component_idx):
-            row_3_1_value = getattr(row_3_1_layout.children[0], attr_name).get_value_level()
-            row_3_2_value = getattr(row_3_2_layout.children[0], attr_name).get_value_level()
-            candidate_value = getattr(candidate_layout.children[0], attr_name).get_value_level()
+            row_3_1_value = getattr(row_3_1_layout.children[0],
+                                    attr_name).get_value_level()
+            row_3_2_value = getattr(row_3_2_layout.children[0],
+                                    attr_name).get_value_level()
+            candidate_value = getattr(candidate_layout.children[0],
+                                      attr_name).get_value_level()
             if rule.value > 0:
                 if attr == "Color":
                     if candidate_value == row_3_1_value + row_3_2_value:
@@ -192,15 +207,18 @@ def check_entity(rule, context, candidate, attr, regenerate):
                         ret = 1
                 else:
                     if candidate_value == row_3_1_value - row_3_2_value - 1:
-                        ret = 1                
+                        ret = 1
     else:
         if check_consistency(candidate, attr, component_idx):
-            row_3_1_value = getattr(row_3_1_layout.children[0], attr_name).get_value_level()
-            row_3_2_value = getattr(row_3_2_layout.children[0], attr_name).get_value_level()
-            candidate_value = getattr(candidate_layout.children[0], attr_name).get_value_level()
+            row_3_1_value = getattr(row_3_1_layout.children[0],
+                                    attr_name).get_value_level()
+            row_3_2_value = getattr(row_3_2_layout.children[0],
+                                    attr_name).get_value_level()
+            candidate_value = getattr(candidate_layout.children[0],
+                                      attr_name).get_value_level()
             three_values = rule.value_levels[2]
             if row_3_1_value == three_values[0] and \
                row_3_2_value == three_values[1] and \
                candidate_value == three_values[2]:
-               ret = 1
+                ret = 1
     return ret

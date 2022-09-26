@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 import json
 import xml.etree.ElementTree as ET
 
@@ -28,7 +27,7 @@ def n_tree_serialize(aot):
 def serialize_aot(aot):
     """Meta Structure format
     META_STRUCTURE_FORMAT provided by const.py
-    """    
+    """
     n_tree = n_tree_serialize(aot)
     meta_structure = np.zeros(len(META_STRUCTURE_FORMAT), np.uint8)
     split = n_tree.split(".")
@@ -93,7 +92,8 @@ def dom_problem(instances, rule_groups):
             layout_k.set("name", layout.name)
             layout_k.set("Number", str(layout.number.get_value_level()))
             layout_k.set("Position", json.dumps(layout.position.values))
-            layout_k.set("Uniformity", str(layout.uniformity.get_value_level()))
+            layout_k.set("Uniformity",
+                         str(layout.uniformity.get_value_level()))
             for l in range(len(layout.children)):
                 entity = layout.children[l]
                 entity_l = ET.SubElement(layout_k, "Entity")
@@ -102,8 +102,16 @@ def dom_problem(instances, rule_groups):
                 entity_size = entity.size.get_value()
                 entity_angle = entity.angle.get_value()
                 entity_l.set("bbox", json.dumps(entity_bbox))
-                entity_l.set("real_bbox", json.dumps(get_real_bbox(entity_bbox, entity_type, entity_size, entity_angle)))
-                entity_l.set("mask", rle_encode(get_mask(entity_bbox, entity_type, entity_size, entity_angle)))
+                entity_l.set(
+                    "real_bbox",
+                    json.dumps(
+                        get_real_bbox(entity_bbox, entity_type, entity_size,
+                                      entity_angle)))
+                entity_l.set(
+                    "mask",
+                    rle_encode(
+                        get_mask(entity_bbox, entity_type, entity_size,
+                                 entity_angle)))
                 entity_l.set("Type", str(entity.type.get_value_level()))
                 entity_l.set("Size", str(entity.size.get_value_level()))
                 entity_l.set("Color", str(entity.color.get_value_level()))
