@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-from scipy.misc import comb
+from scipy.special import comb
 
 from const import MAX_COMPONENTS, RULE_ATTR
 from Rule import Rule_Wrapper
