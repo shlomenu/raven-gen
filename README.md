@@ -1,6 +1,6 @@
 # RAVEN
 
-This repo contains code for our CVPR 2019 paper.
+This repo contains a modified version of the code for the following CVPR 2019 paper.
 
 [RAVEN: A Dataset for <u>R</u>elational and <u>A</u>nalogical <u>V</u>isual r<u>E</u>aso<u>N</u>ing](http://wellyzhang.github.io/attach/cvpr19zhang.pdf)  
 Chi Zhang*, Feng Gao*, Baoxiong Jia, Yixin Zhu, Song-Chun Zhu  
@@ -45,7 +45,7 @@ We show performance of models in the following table. For details, please check 
 # Dependencies
 
 **Important**
-* Python 2.7
+* Python 3.8
 * OpenCV
 * PyTorch
 * CUDA and cuDNN expected
