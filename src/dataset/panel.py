@@ -249,6 +249,37 @@ class Component:
                 Entity(name=str(i), bbox=bbox, constraints=self.constraints)
                 for i, bbox in enumerate(self.config.position.value)]
 
+    def sample_unique(self, attr, ground_truth):
+        if attr is AttributeType.NUMBER:
+            self.config.sample_unique(
+                self.initial_constraints, ground_truth.history,
+                record=True, overwrite=True)
+            self.sample(sample_position=True, carryover=False)
+        elif attr is AttributeType.POSITION:
+            self.config.position.sample_unique(
+                self.config.number.value, ground_truth.history,
+                record=True, overwrite=True)
+            self.set_position()
+        elif attr is AttributeType.ANGLE or \
+                attr is AttributeType.UNIFORMITY:
+            raise ValueError(
+                f"unsupported operation on attribute of type: {attr!s}"
+            )
+        elif attr in AttributeType:
+            def sample_attr_unique(e, attr):
+                attr = getattr(e, attr.name.lower())
+                attr.sample_unique(
+                    self.initial_constraints, ground_truth.history,
+                    record=True, overwrite=True)
+            if self.uniformity.value:
+                sample_attr_unique(self.entities[0], attr)
+                self.make_uniform(attr)
+            else:
+                for entity in self.entities:
+                    sample_attr_unique(entity, attr)
+        else:
+            raise ValueError("unsupported operation")
+
     def reset_history(self):
         self.history = AttributeHistory(self.initial_constraints)
 
@@ -432,38 +463,6 @@ class Panel:
                 else:
                     return None
         return pruned
-
-    def sample_unique(self, c: int, attr, panel):
-        component = self.components[c]
-        if attr is AttributeType.NUMBER:
-            component.config.sample_unique(
-                component.initial_constraints, panel.components[c].history,
-                record=True, overwrite=True)
-            component.sample(sample_position=True, carryover=False)
-        elif attr is AttributeType.POSITION:
-            component.config.position.sample_unique(
-                component.config.number.value, panel.components[c].history,
-                record=True, overwrite=True)
-            component.set_position()
-        elif attr is AttributeType.ANGLE or \
-                attr is AttributeType.UNIFORMITY:
-            raise ValueError(
-                f"unsupported operation on attribute of type: {attr!s}"
-            )
-        elif attr in AttributeType:
-            def sample_attr_unique(e, attr):
-                attr = getattr(e, attr.name.lower())
-                attr.sample_unique(
-                    component.initial_constraints, panel.components[c].history,
-                    record=True, overwrite=True)
-            if component.uniformity.value:
-                sample_attr_unique(component.entities[0], attr)
-                component.make_uniform(attr)
-            else:
-                for entity in component.entities:
-                    sample_attr_unique(entity, attr)
-        else:
-            raise ValueError("unsupported operation")
 
     @ classmethod
     def make_center_single(cls):
@@ -656,3 +655,4 @@ class Panel:
         return canvas - background
 
     def json(self):
+        pass

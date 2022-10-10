@@ -40,10 +40,12 @@ class Matrix:
         for component in ground_truth.components:
             component.reset_history()
         for _ in range(7):
-            c, attr_name = self.sample_attr(
+            c, attr = self.sample_attr(
                 modifiable_attr)
             alternative = copy.deepcopy(ground_truth)
-            alternative.sample_unique(c, attr_name, ground_truth)
+            alternative.components[c].sample_unique(
+                attr, ground_truth.components[c])
+            alternative.sample_unique(c, attr, ground_truth)
             self.candidates.append(alternative)
 
         random.shuffle(self.candidates)
