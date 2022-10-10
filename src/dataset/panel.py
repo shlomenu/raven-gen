@@ -1,444 +1,658 @@
 from __future__ import annotations
-from typing import Optional
 import copy
+from dataclasses import dataclass
+from typing import List, Optional, Union, Dict, NamedTuple
+from collections import namedtuple
+from enum import Enum, auto
 
 import numpy as np
 from scipy.special import comb
+import cv2
 
-from attribute import Angle, Color, Number, Position, Size, Type, Uniformity
-from configuration import LevelType, NodeType, AttributeType
-from constraints import rule_constraint
-from rule import Rules
+from attribute import (AttributeType, Uniformity, Type,
+                       Size, Color, Angle, Configuration, Shape,
+                       NUM_MIN, NUM_MAX, TYPE_MIN, TYPE_MAX,
+                       SIZE_MIN, SIZE_MAX, COLOR_MIN, COLOR_MAX,
+                       ANGLE_MIN, ANGLE_MAX, UNI_MIN, UNI_MAX)
+from rendering import rotate, IMAGE_SIZE, Point, DEFAULT_WIDTH
+from rule import Rules, RuleType
 
 
-class Level:
-    """
-    Superclass for a level of organization within a `Panel`.  The following 
-    interface is expected of all subclasses:
+class PositionType(Enum):
+    PLANAR = auto()
+    ANGULAR = auto()
 
-        `(_)sample`: return a new panel backed by different memory and constrained
-            randomly-sampled values of the POSITION, TYPE, SIZE, COLOR, and ANGLE
-            without modifying the original.
 
-        `(_)resample`: update attributes in place with constrained randomly-sampled
-            values of POSITION, TYPE, SIZE, COLOR, and ANGLE.  If `resample_number=True`
-            is passed, NUMBER will be resampled as well.
+@dataclass
+class PlanarPosition:
+    x_c: Union[int, float]
+    y_c: Union[int, float]
+    max_w: Union[int, float]
+    max_h: Union[int, float]
 
-        `(_)sample_new`: update attributes in place with constrained randomly-sampled
-            values of the specified attribute which have not been sampled via this 
-            method before.  
 
-    This API is somewhat counter to the one found in `attribute.py`; there, `sample`
-    is an in-place method and `sample_new` is not in-place.  Here, it is opposite.
-    Only this API is directly relevant to understanding `main.py`.
+@dataclass
+class AngularPosition:
+    x_c: Union[int, float]
+    y_c: Union[int, float]
+    max_w: Union[int, float]
+    max_h: Union[int, float]
+    x_r: Union[int, float]
+    y_r: Union[int, float]
+    omega: Union[int, float]
 
-    Some additional methods are provided by specific subclasses of Level. The above 
-    API still has "entry points" at specific levels contained within a Panel, as 
-    indicated by the presence of absence of a leading underscore.  This design
-    may be refactored in the future to offer all relevant functionality as top-level
-    methods of `Panel`, as the inherited usage of subclassing seems to create more 
-    code duplication than it eliminates.
-    """
 
-    def __init__(self,
-                 name: str,
-                 level: LevelType,
-                 node_type: NodeType,
-                 is_pg=False):
+@dataclass
+class Bounds:
+    min: int
+    max: int
+
+
+@dataclass
+class Constraints:
+    number: Bounds
+    type: Bounds
+    size: Bounds
+    color: Bounds
+    angle: Bounds
+    uniformity: Bounds
+    position_type: PositionType
+    positions: Union[List[AngularPosition], List[PlanarPosition]]
+
+
+class Entity:
+
+    def __init__(self, name, bbox, constraints):
         self.name = name
-        self.level = level
-        self.node_type = node_type
-        self.children = []
-        self.is_pg = is_pg
+        self.bbox = bbox
+        self.type = Type(constraints)
+        self.size = Size(constraints)
+        self.color = Color(constraints)
+        self.angle = Angle(constraints)
 
-    def insert(self, node: Level):
-        assert isinstance(node, Level)
-        assert self.node_type is not NodeType.LEAF
-        assert node.level is self.level.below()
-        self.children.append(node)
+    def sample(self, constraints):
+        self.type.sample(constraints)
+        self.size.sample(constraints)
+        self.color.sample(constraints)
+        self.angle.sample(constraints)
 
-    def _resample(self, resample_number: bool):
-        """
-        Resample the layout. If the number of entities change, resample also the 
-        position distribution; otherwise only resample each attribute for each entity.
-        :param resample_number: whether the number has been reset
-        """
-        assert self.is_pg
-        if self.node_type is NodeType.AND:
-            for child in self.children:
-                child._resample(resample_number)
+    def render_entity(self):
+        img = np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)
+        center = Point(y=int(self.bbox.y_c * IMAGE_SIZE),
+                       x=int(self.bbox.x_c * IMAGE_SIZE))
+        unit = min(self.bbox.max_w, self.bbox.max_h) * IMAGE_SIZE // 2
+        # minus because of the way we show the image, see render_panel's return
+        color = 255 - self.color.value
+        width = DEFAULT_WIDTH
+        if self.type.value is Shape.TRIANGLE:
+            dl = int(unit * self.size.value)
+            pts = np.array(
+                [[center.y, center.x - dl],
+                 [center.y + int(dl / 2.0 * np.sqrt(3)),
+                  center.x + int(dl / 2.0)],
+                 [center.x - int(dl / 2.0 * np.sqrt(3)),
+                  center.x + int(dl / 2.0)]
+                 ], np.int32).reshape((-1, 1, 2))
+            if color != 0:  # filled
+                cv2.fillConvexPoly(img, pts, color)  # fill the interior
+                cv2.polylines(img, [pts], True, 255, width)  # draw the edge
+            else:  # not filled
+                cv2.polylines(img, [pts], True, 255, width)
+        elif self.type.value is Shape.SQUARE:
+            dl = int(unit / 2 * np.sqrt(2) * self.size.value)
+            pt1 = (center.y - dl, center.x - dl)
+            pt2 = (center.y + dl, center.x + dl)
+            if color != 0:
+                cv2.rectangle(img, pt1, pt2, color, -1)
+                cv2.rectangle(img, pt1, pt2, 255, width)
+            else:
+                cv2.rectangle(img, pt1, pt2, 255, width)
+        elif self.type.value is Shape.PENTAGON:
+            dl = int(unit * self.size.value)
+            pts = np.array([[center.y, center.x - dl],
+                            [
+                                center.y - int(dl * np.cos(np.pi / 10)),
+                                center.x - int(dl * np.sin(np.pi / 10))
+            ],
+                [
+                                center.y - int(dl * np.sin(np.pi / 5)),
+                                center.x + int(dl * np.cos(np.pi / 5))
+            ],
+                [
+                                center.y + int(dl * np.sin(np.pi / 5)),
+                                center.x + int(dl * np.cos(np.pi / 5))
+            ],
+                [
+                                center.y + int(dl * np.cos(np.pi / 10)),
+                                center.x - int(dl * np.sin(np.pi / 10))
+            ]], np.int32).reshape((-1, 1, 2))
+            if color != 0:
+                cv2.fillConvexPoly(img, pts, color)
+                cv2.polylines(img, [pts], True, 255, width)
+            else:
+                cv2.polylines(img, [pts], True, 255, width)
+        elif self.type.value is Shape.HEXAGON:
+            dl = int(unit * self.size.value)
+            pts = np.array(
+                [[center.y, center.x - dl],
+                 [center.y - int(dl / 2.0 * np.sqrt(3)),
+                  center.x - int(dl / 2.0)],
+                 [center.y - int(dl / 2.0 * np.sqrt(3)),
+                  center.x + int(dl / 2.0)],
+                 [center.y, center.x + dl],
+                 [center.y + int(dl / 2.0 * np.sqrt(3)),
+                  center.x + int(dl / 2.0)],
+                 [center.y + int(dl / 2.0 * np.sqrt(3)),
+                  center.x - int(dl / 2.0)]
+                 ], np.int32).reshape((-1, 1, 2))
+            if color != 0:
+                cv2.fillConvexPoly(img, pts, color)
+                cv2.polylines(img, [pts], True, 255, width)
+            else:
+                cv2.polylines(img, [pts], True, 255, width)
+        elif self.type.value is Shape.CIRCLE:
+            radius = int(unit * self.size.value)
+            if color != 0:
+                cv2.circle(img, tuple(center), radius, color, -1)
+                cv2.circle(img, tuple(center), radius, 255, width)
+            else:
+                cv2.circle(img, tuple(center), radius, 255, width)
+        elif self.type.value is Shape.NONE:
+            pass
+        if isinstance(self.bbox, AngularPosition):
+            img = rotate(img,
+                         self.bbox.omega,
+                         center=Point(x=(self.bbox.x_r * IMAGE_SIZE),
+                                      y=(self.bbox.y_r * IMAGE_SIZE)))
+        elif isinstance(self.bbox, PlanarPosition):
+            img = rotate(img, self.angle.value, center=center)
         else:
-            self.children[0]._resample(resample_number)
-
-    def __repr__(self):
-        return self.level + "." + self.name
-
-    def __str__(self):
-        return self.level + "." + self.name
+            raise ValueError("unknown position type: not angular or planar")
+        return img
 
 
-class Panel(Level):
+@dataclass
+class AttributeHistory:
 
-    def __init__(self, name, is_pg=False):
-        super(Panel, self).__init__(name,
-                                    level=LevelType.ROOT,
-                                    node_type=NodeType.OR,
-                                    is_pg=is_pg)
-
-    @property
-    def structure(self):
-        return self.children[0]
-
-    @property.setter
-    def structure(self, structure: Structure):
-        assert (len(self.children) <= 1)
-        del self.children[:]
-        self.insert(structure)
-
-    def sample(self) -> Level:
-        if self.is_pg:
-            raise ValueError("cannot sample on a PG")
-        new_panel = Panel(self.name, is_pg=self.is_pg)
-        new_panel.structure = self.structure._sample()
-        return new_panel
-
-    def resample(self, resample_number=False):
-        self._resample(resample_number)
-
-    def prune(self, rules: Rules) -> Optional[Level]:
-        """
-        Prune the AoT such that all branches satisfy the constraints; not in-place. 
-        """
-        new_panel = Panel(self.name)
-        if len(self.structure.components) == len(rules):
-            new_structure = self.structure._prune(rules)
-            if new_structure is not None:
-                new_panel.structure = new_structure
-        if len(new_panel.children) == 0:
-            new_panel = None
-        return new_panel
-
-    def prepare(self):
-        """
-        Retrieve data used to render constituent entities.
-        :returns: the type of structure contained at this root and all 
-            constituent entities of each component and its layout.
-        """
-        assert self.is_pg
-        assert self.level is LevelType.SCENE
-        return (self.structure.name, [
-            entity for component in self.structure.components
-            for entity in component.layout.entities
-        ])
-
-    def sample_new(self, component_idx: int, attribute_name: AttributeType,
-                   min_level: int, max_level: int, panel: Level):
-        assert self.is_pg
-        self.structure._sample_new(component_idx, attribute_name, min_level,
-                                   max_level, panel.structure)
+    def __init__(self, constraints):
+        PositionHistory = namedtuple(
+            "PositionHistory", ["available", "sampled"])
+        self.number: List[int] = []
+        self.position: Dict[int, NamedTuple[int, List[np.ndarray]]] = {}
+        self.type: List[int] = []
+        self.size: List[int] = []
+        self.color: List[int] = []
+        self.angle: List[int] = []
+        for i in range(constraints.number.min + 1, constraints.number.max + 2):
+            self.position[i] = PositionHistory(available=comb(
+                constraints.positions.shape[0], i), sampled=[])
 
 
-class Structure(Level):
+@dataclass
+class Component:
 
-    def __init__(self, name, is_pg=False):
-        super(Structure, self).__init__(name,
-                                        level=LevelType.STRUCTURE,
-                                        node_type=NodeType.AND,
-                                        is_pg=is_pg)
+    def __init__(self, component_type: ComponentType, layout_type: LayoutType, constraints: Constraints):
+        self.component_type = component_type
+        self.layout_type = layout_type
+        self.constraints = constraints
+        self.config = Configuration(self.constraints)
+        self.uniformity = Uniformity(self.constraints)
+        self.history = AttributeHistory(self.constraints)
+        self.entities = []
+        self.initial_constraints = copy.deepcopy(self.constraints)
+
+    def setting_of(self, attr):
+        return self.attr(attr).setting
+
+    def attr(self, attr):
+        return getattr(self.entity, attr.name.lower())
 
     @property
-    def components(self):
-        return self.children
+    def entity(self):
+        return self.entities[0]
 
-    def insert(self, component: Component):
-        super(Structure, self).insert(component)
-        assert (len(self.components) <= 2)
+    def make_uniform(self, attr):
+        setting = self.setting_of(attr)
+        for entity in self.entities[1:]:
+            entity_attr = getattr(entity, attr.name.lower())
+            entity_attr.setting = setting
 
-    def _sample(self):
-        if self.is_pg:
-            raise ValueError("Could not sample on a PG")
-        new_structure = Structure(self.name, is_pg=self.is_pg)
-        for component in self.components:
-            new_structure.insert(component._sample())
-        return new_structure
+    def set_uniform(self, attr, setting):
+        for entity in self.entities:
+            entity_attr = getattr(entity, attr.name.lower())
+            entity_attr.setting = setting
 
-    def _prune(self, rules):
-        new_structure = Structure(self.name)
-        # all components must satisfy their corresponding rules
-        for component_rules, component in zip(rules, self.components):
-            new_component = component._prune(component_rules)
-            if new_component is None:
-                return None
-            new_structure.insert(new_component)
-        return new_structure
+    def set_position(self):
+        for entity, bbox in zip(self.entities, self.config.position.value):
+            entity.bbox = bbox
 
-    def _sample_new(self, c: int, attribute_name: AttributeType,
-                    min_level: int, max_level: int, structure: Structure):
-        self.components[c]._sample_new(attribute_name, min_level, max_level,
-                                       structure.components[c])
+    def sample(self, sample_position=False, sample_number=False, carryover=True, uniform=None):
+        if sample_position or sample_number:
+            if sample_number:
+                self.config.number.sample(self.constraints)
+            self.config.position.sample(self.config.number.value)
+        if uniform is None:
+            uniform = self.uniformity.value
+        if uniform:
+            if len(self.entities) > 0 and carryover:
+                self.entities = [self.entities[0]]
+            else:
+                self.entities = [Entity(
+                    name=str(0), bbox=self.config.position.value[0], constraints=self.constraints)]
+            for i, bbox in self.config.position.value[1:]:
+                entity = copy.deepcopy(self.entities[0])
+                entity.name = str(i)
+                entity.bbox = bbox
+                self.entities.append(entity)
+        else:
+            self.entities = [
+                Entity(name=str(i), bbox=bbox, constraints=self.constraints)
+                for i, bbox in enumerate(self.config.position.value)]
 
-
-class Component(Level):
-
-    def __init__(self, name, is_pg=False):
-        super(Component, self).__init__(name,
-                                        level=LevelType.COMPONENT,
-                                        node_type=NodeType.OR,
-                                        is_pg=is_pg)
-
-    @property
-    def layout(self):
-        return self.children[0]
-
-    @property.setter
-    def layout(self, layout: Layout):
-        assert (len(self.children) <= 1)
-        del self.children[:]
-        self.insert(layout)
-
-    def _sample(self):
-        if self.is_pg:
-            raise ValueError("Could not sample on a PG")
-        new_component = Component(self.name, is_pg=self.is_pg)
-        new_component.insert(self.layout._sample())
-        return new_component
-
-    def _prune(self, rules: Rules):
-        new_component = Component(self.name)
-        new_layout = self.layout._update_constraint(rules)
-        if new_layout is not None:
-            new_component.layout = new_layout
-        if len(new_component.children) == 0:
-            new_component = None
-        return new_component
-
-    def _sample_new(self, attr_name, min_level, max_level, component):
-        self.layout._sample_new(attr_name, min_level, max_level,
-                                component.layout)
+    def reset_history(self):
+        self.history = AttributeHistory(self.initial_constraints)
 
 
-class Layout(Level):
-    """
-    Layout is the highest level of the hierarchy with attributes; it 
-    has the attributes Number, Position, and Uniformity. Layouts should
-    be deep-copied to preserve the state of their attributes. 
-    """
+class StructureType(Enum):
+    SINGLETON = auto()
+    LEFT_RIGHT = auto()
+    UP_DOWN = auto()
+    OUT_IN = auto()
+
+
+class ComponentType(Enum):
+    GRID = auto()
+    LEFT = auto()
+    RIGHT = auto()
+    UP = auto()
+    DOWN = auto()
+    OUT = auto()
+    IN = auto()
+
+
+class LayoutType(Enum):
+    CENTER_SINGLE = auto()
+    DISTRIBUTE_FOUR = auto()
+    DISTRIBUTE_NINE = auto()
+    LEFT_CENTER_SINGLE = auto()
+    RIGHT_CENTER_SINGLE = auto()
+    UP_CENTER_SINGLE = auto()
+    DOWN_CENTER_SINGLE = auto()
+    OUT_CENTER_SINGLE = auto()
+    IN_CENTER_SINGLE = auto()
+    IN_DISTRIBUTE_FOUR = auto()
+
+
+class Panel:
 
     def __init__(self,
-                 name,
-                 layout_constraints,
-                 entity_constraints,
-                 orig_layout_constraints=None,
-                 orig_entity_constraints=None,
-                 sample_new_num_count=None,
-                 is_pg=False):
-        super(Layout, self).__init__(name,
-                                     level=LevelType.LAYOUT,
-                                     node_type=NodeType.AND,
-                                     is_pg=is_pg)
-        self.layout_constraints = layout_constraints
-        self.entity_constraints = entity_constraints
-        self.number = Number(min_level=layout_constraints.number.min,
-                             max_level=layout_constraints.number.max)
-        self.position = Position(
-            pos_type=layout_constraints.position.position_type,
-            pos_list=layout_constraints.position.positions)
-        self.uniformity = Uniformity(
-            min_level=layout_constraints.uniformity.min,
-            max_level=layout_constraints.uniformity.max)
-        self.number.sample()
-        self.position.sample(self.number.value())
-        self.uniformity.sample()
-        # store initial layout_constraints and entity_constraints for answer generation
-        if orig_layout_constraints is None:
-            orig_layout_constraints = copy.deepcopy(self.layout_constraints)
-        self.orig_layout_constraints = orig_layout_constraints
-        if orig_entity_constraints is None:
-            orig_entity_constraints = copy.deepcopy(self.entity_constraints)
-        self.orig_entity_constraints = orig_entity_constraints
-        if sample_new_num_count is None:
-            self.sample_new_num_count = dict()
-            max_entities = self.position.values.shape[0]
-            for n_entities in range(layout_constraints.number.min + 1,
-                                    layout_constraints.number.max + 2):
-                self.sample_new_num_count[n_entities] = [
-                    comb(max_entities, n_entities), []
-                ]
+                 structure_type,
+                 component_1_type,
+                 layout_1_type,
+                 position_type_1,
+                 positions_1,
+                 number_min_1=NUM_MIN,
+                 number_max_1=NUM_MAX,
+                 type_min_1=TYPE_MIN,
+                 type_max_1=TYPE_MAX,
+                 size_min_1=SIZE_MIN,
+                 size_max_1=SIZE_MAX,
+                 color_min_1=COLOR_MIN,
+                 color_max_1=COLOR_MAX,
+                 angle_min_1=ANGLE_MIN,
+                 angle_max_1=ANGLE_MAX,
+                 uniformity_min_1=UNI_MIN,
+                 uniformity_max_1=UNI_MAX,
+                 component_2_type=None,
+                 layout_2_type=None,
+                 position_type_2=None,
+                 positions_2=None,
+                 number_min_2=NUM_MIN,
+                 number_max_2=NUM_MAX,
+                 type_min_2=TYPE_MIN,
+                 type_max_2=TYPE_MAX,
+                 size_min_2=SIZE_MIN,
+                 size_max_2=SIZE_MAX,
+                 color_min_2=COLOR_MIN,
+                 color_max_2=COLOR_MAX,
+                 angle_min_2=ANGLE_MIN,
+                 angle_max_2=ANGLE_MAX,
+                 uniformity_min_2=UNI_MIN,
+                 uniformity_max_2=UNI_MAX):
+        self.structure_type = structure_type
+        self.component_1_type = component_1_type
+        self.component_1 = Component(
+            component_type=component_1_type,
+            layout_type=layout_1_type,
+            constraints=Constraints(
+                number=Bounds(min=number_min_1, max=number_max_1),
+                type=Bounds(min=type_min_1, max=type_max_1),
+                size=Bounds(min=size_min_1, max=size_max_1),
+                color=Bounds(min=color_min_1, max=color_max_1),
+                angle=Bounds(min=angle_min_1, max=angle_max_1),
+                uniformity=Bounds(min=uniformity_min_1, max=uniformity_max_1),
+                position_type=position_type_1,
+                positions=positions_1))
+        if component_2_type and layout_2_type:
+            self.component_2 = Component(
+                component_type=component_2_type,
+                layout_type=layout_2_type,
+                constraints=Constraints(
+                    number=Bounds(min=number_min_2, max=number_max_2),
+                    type=Bounds(min=type_min_2, max=type_max_2),
+                    size=Bounds(min=size_min_2, max=size_max_2),
+                    color=Bounds(min=color_min_2, max=color_max_2),
+                    angle=Bounds(min=angle_min_2, max=angle_max_2),
+                    uniformity=Bounds(min=uniformity_min_2,
+                                      max=uniformity_max_2),
+                    position_type=position_type_2,
+                    positions=positions_2))
+            self.components = (self.component_1, self.component_2)
         else:
-            self.sample_new_num_count = sample_new_num_count
+            self.components = (self.component_1,)
 
-    @property
-    def entities(self):
-        return self.children
+    def prune(self, rules: Rules) -> Optional[Panel]:
+        """
+        Modify the bounds of attributes based on the rules that will be applied
+        to them to ensure those rules can be properly expressed with the given
+        range of values; if this cannot be done by tightening bounds, returns None.
+        """
+        pruned = copy.deepcopy(self)
+        for component, component_rules in zip(pruned.components, rules):
+            del component.entities[:]
+            for rule in component_rules.all:
+                if rule.attr in AttributeType and \
+                        rule.attr is not AttributeType.ANGLE and \
+                        rule.attr is not AttributeType.UNIFORMITY:
+                    if rule.attr is AttributeType.NUMBER or rule.attr is AttributeType.POSITION:
+                        bounds = getattr(component, rule.attr.name.lower())
+                    else:
+                        bounds = getattr(component.constraints,
+                                         rule.attr.name.lower())
+                    if rule.name is RuleType.PROGRESSION:
+                        if rule.attr is AttributeType.POSITION:
+                            # bounds.max is setting indicating number of positions
+                            # in this layout;
+                            #
+                            #   bounds.max >= bounds.min + 2 * abs(rule.value)
+                            #
+                            # ensures that entities can be shifted `rule.value`
+                            # positions over before landing in a position that
+                            # was occupied within the row.
+                            bounds.max = bounds.max - 2 * abs(rule.value)
+                        elif bounds:
+                            # bounds.max >= bounds.min + 2 * rule.value
+                            if rule.value > 0:
+                                bounds.max = bounds.max - 2 * rule.value
+                            else:
+                                bounds.min = bounds.min - 2 * rule.value
+                    elif rule.name is RuleType.ARITHMETIC:
+                        if rule.attr is AttributeType.POSITION:
+                            # Forbid filling all positions so that set union
+                            #  appears different from constancy; disallow the
+                            #  sampling of disjoint subsets so that set difference
+                            #  is visible.
+                            if rule.value <= 0:
+                                bounds.min = bounds.max // 2
+                            bounds.max = bounds.max - 1
+                        elif rule.attr is AttributeType.NUMBER or rule.attr is AttributeType.SIZE:
+                            # bounds.max >= 2 * bounds.min + 1
+                            if rule.value > 0:
+                                bounds.max = bounds.max - bounds.min - 1
+                            else:
+                                bounds.min = 2 * bounds.min + 1
+                        elif rule.attr is AttributeType.COLOR:
+                            # bounds.max >= bounds.min + 1
+                            #   && bounds.max >= 2 * bounds.min
+                            if bounds.max - bounds.min < 1:
+                                return None
+                            elif rule.value > 0:
+                                bounds.max = bounds.max - bounds.min
+                            elif rule.value < 0:
+                                bounds.min = 2 * bounds.min
+                    elif rule.name is RuleType.DISTRIBUTE_THREE:
+                        if rule.attr is AttributeType.POSITION:
+                            # There are n choose k sets of positions in which to
+                            # place k entities within a panel containing at most
+                            # n entities (n is initially given by `bounds.max + 1`).
+                            # Since the lowest setting of number corresponds to one
+                            # entity, k >= 1.  If we restrict n >= 3 and k < n, then
+                            # n choose k >= 3, as is required to apply the rule.
+                            if bounds.max + 1 < 3:
+                                return None
+                            else:
+                                bounds.max = bounds.max - 1
+                        elif bounds:
+                            # require three distinct settings
+                            if bounds.max - bounds.min + 1 < 3:
+                                return None
+                    if bounds.max < bounds.min:
+                        return None
+                    component.config.reset()
+                else:
+                    return None
+        return pruned
 
-    def add_new(self, *bboxes):
-        """
-        Add new entities into this level.
-        :param bboxes: tuple of new entities
-        """
-        name = self.number.value()
-        for i, bbox in enumerate(bboxes):
-            name += i
-            new_entity = copy.deepcopy(self.entities[0])
-            new_entity.name = str(name)
-            new_entity.bbox = bbox
-            if not self.uniformity.value():
-                new_entity.resample()
-            self.insert(new_entity)
-
-    def resample(self, resample_number=False):
-        self._resample(resample_number)
-
-    def __populate(self, receiver, bboxes):
-        if self.uniformity.value():
-            new_entity = Entity(name=str(0),
-                                bbox=bboxes[0],
-                                entity_constraints=self.entity_constraints)
-            receiver.insert(new_entity)
-            for i, bbox in enumerate(bboxes[1:], start=1):
-                new_entity = copy.deepcopy(new_entity)
-                new_entity.name = str(i)
-                new_entity.bbox = bbox
-                receiver.insert(new_entity)
-        else:
-            for i, bbox in enumerate(bboxes):
-                receiver.insert(
-                    Entity(name=str(i),
-                           bbox=bbox,
-                           entity_constraints=self.entity_constraints))
-        return receiver
-
-    def _sample(self):
-        """
-        Though Layout is an "and" node, we do not enumerate all possible configurations, but rather
-        we treat it as a sampling process such that different configurations are sampled.  After 
-        the sampling, the lower level entities are instantiated.
-        :returns: a separate sampled layout
-        """
-        new_layout = copy.deepcopy(self)
-        new_layout.is_pg = True
-        return self.__populate(new_layout, self.position.value())
-
-    def _resample(self, resample_number: bool):
-        """
-        Resample each attribute for every entity. This function is called across rows.
-        :param resample_number: whether to resample the Number attribute
-        """
-        if resample_number:
-            self.number.sample()
-        del self.entities[:]
-        self.position.sample(self.number.value())
-        self.__populate(self, self.position.value())
-
-    def _update_constraint(self, rules: Rules) -> Optional[Level]:
-        """
-        Update the constraints of the layout. If one constraint is not satisfied, 
-        return None so that this structure is disgarded.
-        """
-        new_layout_constraints, new_entity_constraints = rule_constraint(
-            rules, self.layout_constraints, self.entity_constraints)
-        for bounds in [
-                new_layout_constraints.number,
-                new_layout_constraints.uniformity, new_entity_constraints.type,
-                new_entity_constraints.size, new_entity_constraints.color
-        ]:
-            if bounds.min > bounds.max:
-                return None
-
-        return Layout(self.name, new_layout_constraints,
-                      new_entity_constraints, self.orig_layout_constraints,
-                      self.orig_entity_constraints, self.sample_new_num_count)
-
-    def reset_constraint(self, attribute):
-        """
-        Propagates changes to the layout constraints to their respective attributes.
-        """
-        attribute_name = attribute.name.lower()
-        attribute = getattr(self, attribute_name)
-        constraint = getattr(self.layout_constraints, attribute_name)
-        attribute.min_level, attribute.max_level = constraint.min, constraint.max
-
-    def _sample_new(self, attribute_name, min_level, max_level, layout):
-        if attribute_name is AttributeType.NUMBER:
-            while True:
-                value_level = self.number.sample_new(min_level, max_level)
-                if layout.sample_new_num_count[value_level][0] == 0:
-                    continue
-                new_number_value_level = self.number.value(value_level)
-                new_value_level = self.position.sample_new(
-                    new_number_value_level)
-                new_position_set = set(new_value_level)
-                if new_position_set not in layout.sample_new_num_count[
-                        value_level][1]:
-                    layout.sample_new_num_count[value_level][0] -= 1
-                    layout.sample_new_num_count[value_level][1].append(
-                        new_position_set)
-                    break
-            self.number.value_level = value_level
-            self.position.value_level = new_value_level
-            del self.entities[:]
-            for i, bbox in enumerate(self.position.value()):
-                self.insert(
-                    Entity(name=str(i),
-                           bbox=bbox,
-                           entity_constraints=self.entity_constraints))
-        elif attribute_name is AttributeType.POSITION:
-            new_value_level = self.position.sample_new(self.number.value())
-            layout.position.previous_values.append(new_value_level)
-            self.position.value_level = new_value_level
-            for bbox, entity in zip(self.position.value(), self.entities):
-                entity.bbox = bbox
-        elif attribute_name is AttributeType.ANGLE or \
-                attribute_name is AttributeType.UNIFORMITY:
+    def sample_unique(self, c: int, attr, panel):
+        component = self.components[c]
+        if attr is AttributeType.NUMBER:
+            component.config.sample_unique(
+                component.initial_constraints, panel.components[c].history,
+                record=True, overwrite=True)
+            component.sample(sample_position=True, carryover=False)
+        elif attr is AttributeType.POSITION:
+            component.config.position.sample_unique(
+                component.config.number.value, panel.components[c].history,
+                record=True, overwrite=True)
+            component.set_position()
+        elif attr is AttributeType.ANGLE or \
+                attr is AttributeType.UNIFORMITY:
             raise ValueError(
-                f"unsupported operation on attribute of type: {attribute_name!s}"
+                f"unsupported operation on attribute of type: {attr!s}"
             )
-        elif attribute_name in AttributeType:
-            for entity, orig_entity in zip(self.entities, layout.entities):
-                attr_of = lambda e: getattr(e, attribute_name.name.lower())
-                attribute, orig_attribute = attr_of(entity), attr_of(
-                    orig_entity)
-                attribute.value_level = attribute.sample_new(
-                    min_level, max_level)
-                orig_attribute.previous_values.append(attribute.value_level)
+        elif attr in AttributeType:
+            def sample_attr_unique(e, attr):
+                attr = getattr(e, attr.name.lower())
+                attr.sample_unique(
+                    component.initial_constraints, panel.components[c].history,
+                    record=True, overwrite=True)
+            if component.uniformity.value:
+                sample_attr_unique(component.entities[0], attr)
+                component.make_uniform(attr)
+            else:
+                for entity in component.entities:
+                    sample_attr_unique(entity, attr)
         else:
             raise ValueError("unsupported operation")
 
+    @ classmethod
+    def make_center_single(cls):
+        return cls(
+            structure_type=StructureType.SINGLETON,
+            component_1_type=ComponentType.GRID,
+            layout_1_type=LayoutType.CENTER_SINGLE,
+            position_type_1=PositionType.PLANAR,
+            positions_1=[PlanarPosition(x_c=0.5, y_c=0.5, max_w=1, max_h=1)],
+            number_min_1=0,
+            number_max_1=0,
+            type_min_1=1)
 
-class Entity(Level):
+    @ classmethod
+    def make_distribute_four(cls):
+        return cls(
+            structure_type=StructureType.SINGLETON,
+            component_1_type=ComponentType.GRID,
+            layout_1_type=LayoutType.DISTRIBUTE_FOUR,
+            position_type_1=PositionType.PLANAR,
+            positions=[
+                PlanarPosition(x_c=0.25, y_c=0.25, max_w=0.5, max_y=0.5),
+                PlanarPosition(x_c=0.25, y_c=0.75, max_w=0.5, max_y=0.5),
+                PlanarPosition(x_c=0.75, y_c=0.25, max_w=0.5, max_y=0.5),
+                PlanarPosition(x_c=0.75, y_c=0.75, max_w=0.5, max_y=0.5)
+            ],
+            number_min_1=0,
+            number_max_1=3,
+            type_min_1=1)
 
-    def __init__(self, name, bbox, entity_constraints):
-        super(Entity, self).__init__(name,
-                                     level=LevelType.ENTITY,
-                                     node_type=NodeType.LEAF,
-                                     is_pg=True)
-        # Attributes
-        # Sample each attribute such that the value lies in the admissible range
-        # Otherwise, random sample
-        self.entity_constraints = entity_constraints
-        self.bbox = bbox
-        self.type = Type(min_level=entity_constraints.type.min,
-                         max_level=entity_constraints.type.max)
-        self.size = Size(min_level=entity_constraints.size.min,
-                         max_level=entity_constraints.size.max)
-        self.color = Color(min_level=entity_constraints.color.min,
-                           max_level=entity_constraints.color.max)
-        self.angle = Angle(min_level=entity_constraints.angle.min,
-                           max_level=entity_constraints.angle.max)
-        self._sample()
+    @ classmethod
+    def make_distribute_nine(cls):
+        return cls(
+            structure_type=StructureType.SINGLETON,
+            component_1_type=ComponentType.GRID,
+            layout_1_type=LayoutType.DISTRIBUTE_NINE,
+            position_type_1=PositionType.PLANAR,
+            positions_1=[
+                PlanarPosition(x_c=0.16, y_c=0.16, max_w=0.33, max_y=0.33),
+                PlanarPosition(x_c=0.16, y_c=0.5, max_w=0.33, max_y=0.33),
+                PlanarPosition(x_c=0.16, y_c=0.83, max_w=0.33, max_y=0.33),
+                PlanarPosition(x_c=0.5, y_c=0.16, max_w=0.33, max_y=0.33),
+                PlanarPosition(x_c=0.5, y_c=0.5, max_w=0.33, max_y=0.33),
+                PlanarPosition(x_c=0.5, y_c=0.83, max_w=0.33, max_y=0.33),
+                PlanarPosition(x_c=0.83, y_c=0.16, max_w=0.33, max_y=0.33),
+                PlanarPosition(x_c=0.83, y_c=0.5, max_w=0.33, max_y=0.33),
+                PlanarPosition(x_c=0.83, y_c=0.83, max_w=0.33, max_y=0.33)
+            ],
+            number_min_1=0,
+            number_max_1=8,
+            type_min_1=1)
 
-    def _sample(self):
-        self.type.sample()
-        self.size.sample()
-        self.color.sample()
-        self.angle.sample()
+    @ classmethod
+    def make_left_center_single_right_center_single(cls):
+        return cls(
+            structure_type=StructureType.LEFT_RIGHT,
+            component_1_type=ComponentType.LEFT,
+            layout_1_type=LayoutType.LEFT_CENTER_SINGLE,
+            position_type_1=PositionType.PLANAR,
+            positions_1=[
+                PlanarPosition(x_c=0.5, y_c=0.25, max_w=0.5, max_h=0.5)
+            ],
+            number_min_1=0,
+            number_max_1=0,
+            type_min_1=1,
+            component_2_type=ComponentType.RIGHT,
+            layout_2_type=LayoutType.RIGHT_CENTER_SINGLE,
+            position_type_2=PositionType.PLANAR,
+            positions_2=[
+                PlanarPosition(x_c=0.5,
+                               y_c=0.75,
+                               max_w=0.5,
+                               max_h=0.5)
+            ],
+            number_min_2=0,
+            number_max_2=0,
+            type_min_2=1)
 
-    def reset_constraint(self, attribute, min_level, max_level):
-        attribute_name = attribute.name.lower()
-        constraint = getattr(self.entity_constraints, attribute_name)
-        constraint.min, constraint.max = min_level, max_level
-        attribute = getattr(self, attribute_name)
-        attribute.min_level, attribute.max_level = min_level, max_level
+    @ classmethod
+    def make_up_center_single_down_center_single(cls):
+        cls(
+            structure_type=StructureType.UP_DOWN,
+            component_1_type=ComponentType.UP,
+            layout_1_type=LayoutType.UP_CENTER_SINGLE,
+            position_type_1=PositionType.PLANAR,
+            positions_1=[
+                PlanarPosition(x_c=0.25, y_c=0.5, max_w=0.5, max_h=0.5)
+            ],
+            number_min_1=0,
+            number_max_1=0,
+            type_min_1=1,
+            component_2_type=ComponentType.DOWN,
+            layout_2_type=LayoutType.DOWN_CENTER_SINGLE,
+            position_type_2=PositionType.PLANAR,
+            positions=[
+                PlanarPosition(x_c=0.75, y_c=0.5, max_w=0.5, max_h=0.5)
+            ],
+            number_min_2=0,
+            number_min_2=0,
+            type_min_2=1)
 
-    def resample(self):
-        self._sample()
+    @ classmethod
+    def make_in_center_single_out_center_single(cls):
+        cls(
+            structure_type=StructureType.OUT_IN,
+            component_1_type=ComponentType.OUT,
+            layout_1_type=LayoutType.OUT_CENTER_SINGLE,
+            position_type_1=PositionType.PLANAR,
+            positions_1=[PlanarPosition(x_c=0.5, y_c=0.5, max_w=1, max_h=1)],
+            number_min_1=0,
+            number_max_1=0,
+            type_min_1=1,
+            size_min_1=3,
+            color_max_1=0,
+            component_2_type=ComponentType.IN,
+            layout_2_type=LayoutType.IN_CENTER_SINGLE,
+            position_type_2=PositionType.PLANAR,
+            positions_2=[
+                PlanarPosition(x_c=0.5, y_c=0.5, max_w=0.33, max_h=0.33)
+            ],
+            number_min_2=0,
+            number_max_2=0,
+            type_min_2=1
+        )
+
+    @ classmethod
+    def make_in_distribute_four_out_center_single(cls):
+        return cls(
+            structure_type=StructureType.OUT_IN,
+            component_1_type=ComponentType.OUT,
+            layout_1_type=LayoutType.OUT_CENTER_SINGLE,
+            position_type_1=PositionType.PLANAR,
+            positions_1=[PlanarPosition(x_c=0.5, y_c=0.5, max_w=1, max_h=1)],
+            number_min_1=0,
+            number_max_1=0,
+            type_min_1=1,
+            size_min_1=3,
+            color_max_1=0,
+            component_2_type=ComponentType.IN,
+            layout_2_type=LayoutType.IN_DISTRIBUTE_FOUR,
+            position_type_2=PositionType.PLANAR,
+            positions_2=[
+                PlanarPosition(x_c=0.42, y_c=0.42, max_w=0.15, max_h=0.15),
+                PlanarPosition(x_c=0.42, y_c=0.58, max_w=0.15, max_h=0.15),
+                PlanarPosition(x_c=0.58, y_c=0.42, max_w=0.15, max_h=0.15),
+                PlanarPosition(x_c=0.58, y_c=0.58, max_w=0.15, max_h=0.15)
+            ],
+            number_min_2=0,
+            number_max_2=3,
+            type_min_2=1,
+            size_min_2=2)
+
+    @ classmethod
+    def make_all(cls):
+        return {
+            "center_single":
+            Panel.make_center_single(),
+            "distribute_four":
+            Panel.make_distribute_four(),
+            "distribute_nine":
+            Panel.make_distribute_nine(),
+            "left_center_single_right_center_single":
+            Panel.make_left_center_single_right_center_single(),
+            "up_center_single_down_center_single":
+            Panel.make_up_center_single_down_center_single(),
+            "in_center_single_out_center_single":
+            Panel.make_in_center_single_out_center_single(),
+            "in_distribute_four_out_center_single":
+            Panel.make_in_distribute_four_out_center_single()
+        }
+
+    def render(self):
+        canvas = np.ones((IMAGE_SIZE, IMAGE_SIZE), np.uint8) * 255
+        entities = []
+        for component in self.components:
+            entities.extend(component.entities)
+        background = np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)
+        # note left components entities are in the lower layer
+        for entity in entities:
+            entity_img = entity.render()
+            background[entity_img > 0] = 0
+            background += entity_img
+        structure_img = np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)
+        if self.structure is StructureType.LEFT_RIGHT:
+            structure_img[:, int(0.5 * IMAGE_SIZE)] = 255.0
+        elif self.structure is StructureType.UP_DOWN:
+            structure_img[int(0.5 * IMAGE_SIZE), :] = 255.0
+        background[structure_img > 0] = 0
+        background += structure_img
+        return canvas - background
+
+    def json(self):
