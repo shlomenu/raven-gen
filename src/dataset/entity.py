@@ -7,7 +7,6 @@ import numpy as np
 
 from attribute import (Type, Size, Color, Angle, Shape, PlanarPosition,
                        AngularPosition)
-from panel import IMAGE_SIZE
 
 
 @dataclass
@@ -20,6 +19,7 @@ class Point:
             yield getattr(self, attr)
 
 
+IMAGE_SIZE = 160
 CENTER = Point(x=IMAGE_SIZE // 2, y=IMAGE_SIZE // 2)
 DEFAULT_RADIUS = IMAGE_SIZE // 4
 DEFAULT_WIDTH = 2

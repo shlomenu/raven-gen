@@ -1,14 +1,14 @@
 from typing import List
 from enum import Enum, auto
 import copy
-import random
 import json
 
 import numpy as np
 from scipy.special import comb
 
+from entity import IMAGE_SIZE
 from component import make_component, ComponentType, LayoutType
-from panel import Panel, IMAGE_SIZE
+from panel import Panel
 from attribute import AttributeType, PositionType, PlanarPosition
 from rule import Rules, RuleType, apply_rule
 
@@ -288,24 +288,24 @@ class Matrix:
             [np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)]
         self.answer = self.panels[-1]
 
-        modifiable_attr = self.sample_modifiable()
-        ground_truth = copy.deepcopy(self.answer)
-        self.candidates = [ground_truth]
-        for component in ground_truth.components:
-            component.reset_history()
-        for _ in range(7):
-            c, attr = self.sample_attr(modifiable_attr)
-            alternative = copy.deepcopy(ground_truth)
-            alternative.components[c].sample_unique(attr,
-                                                    ground_truth.components[c])
-            alternative.sample_unique(c, attr, ground_truth)
-            self.candidates.append(alternative)
+        # modifiable_attr = self.sample_modifiable()
+        # ground_truth = copy.deepcopy(self.answer)
+        # self.candidates = [ground_truth]
+        # for component in ground_truth.components:
+        #     component.reset_history()
+        # for _ in range(2):
+        #     c, attr = self.sample_attr(modifiable_attr)
+        #     alternative = copy.deepcopy(ground_truth)
+        #     alternative.components[c].sample_unique(attr,
+        #                                             ground_truth.components[c])
+        #     alternative.sample_unique(c, attr, ground_truth)
+        #     self.candidates.append(alternative)
 
-        random.shuffle(self.candidates)
-        self.candidate_imgs = [
-            candidate.render() for candidate in self.candidates
-        ]
-        self.answer_location = self.candidates.index(ground_truth)
+        # random.shuffle(self.candidates)
+        # self.candidate_imgs = [
+        #     candidate.render() for candidate in self.candidates
+        # ]
+        # self.answer_location = self.candidates.index(ground_truth)
 
     def make_row(self):
         col_0 = copy.deepcopy(self.start)
