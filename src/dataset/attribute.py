@@ -1,7 +1,8 @@
+from typing import Union
+from dataclasses import dataclass
 from enum import Enum, auto
 
 import numpy as np
-
 
 NUM_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 NUM_MIN = 0
@@ -57,25 +58,25 @@ class Attribute:
 
     @property
     def value(self):
-        return self.values[self.setting].tolist()
+        return self.values[self.setting]
 
     def value_of_setting(self, setting):
-        return self.values[setting].tolist()
+        return self.values[setting]
 
     def reset(self):
         self.setting = self.initial_setting
 
     def __repr__(self):
-        return "attribute." + self.name
+        return f"{self.name.name.title()}(setting={self.setting}, value={self.value}))"
 
     def __str__(self):
-        return "attribute." + self.name
+        return f"{self.name.name.title()}(setting={self.setting}, value={self.value}))"
 
 
 class Sampleable(Attribute):
 
     def __init__(self, name: AttributeType, values, constraints):
-        super(Sampleable, self).__init__(self, name, values)
+        super(Sampleable, self).__init__(name, values)
         self.sample(constraints)
         self.initial_setting = self.setting
 
@@ -87,12 +88,18 @@ class Sampleable(Attribute):
 
 class UniqueSampleable(Sampleable):
 
-    def sample_unique(self, constraints, history, record=True, overwrite=False):
+    def sample_unique(self,
+                      constraints,
+                      history,
+                      record=True,
+                      overwrite=False):
         constraint = getattr(constraints, self.name.name.lower())
         previous_settings = getattr(history, self.name.name.lower())
         all_settings = range(constraint.min, constraint.max + 1)
         new_setting = np.random.choice(
-            list(set(all_settings) - set(previous_settings) - set((self.setting,))))
+            list(
+                set(all_settings) - set(previous_settings) -
+                set((self.setting, ))))
         if record:
             if self.setting not in previous_settings:
                 previous_settings.append(self.setting)
@@ -105,8 +112,33 @@ class UniqueSampleable(Sampleable):
 class Number(UniqueSampleable):
 
     def __init__(self, constraints):
-        super(Number, self).__init__(
-            name=AttributeType.NUMBER, values=NUM_VALUES, constraints=constraints)
+        super(Number, self).__init__(name=AttributeType.NUMBER,
+                                     values=NUM_VALUES,
+                                     constraints=constraints)
+
+
+class PositionType(Enum):
+    PLANAR = auto()
+    ANGULAR = auto()
+
+
+@dataclass
+class PlanarPosition:
+    x_c: Union[int, float]
+    y_c: Union[int, float]
+    max_w: Union[int, float]
+    max_h: Union[int, float]
+
+
+@dataclass
+class AngularPosition:
+    x_c: Union[int, float]
+    y_c: Union[int, float]
+    max_w: Union[int, float]
+    max_h: Union[int, float]
+    x_r: Union[int, float]
+    y_r: Union[int, float]
+    omega: Union[int, float]
 
 
 class Position(Attribute):
@@ -120,11 +152,10 @@ class Position(Attribute):
     a more complex way and implements `sample` and `sample_new`.
     """
 
-    def __init__(self, constraints,
-                 n_entities: int):
+    def __init__(self, constraints, n_entities: int):
         self.position_type = constraints.position_type
-        super(Position, self).__init__(
-            name=AttributeType.POSITION, values=constraints.positions)
+        super(Position, self).__init__(name=AttributeType.POSITION,
+                                       values=constraints.positions)
         self.sample(n_entities)
 
     def sample(self, size):
@@ -162,8 +193,10 @@ class Configuration:
 
     def __init__(self, constraints):
         self.number = Number(constraints)
-        self.position = Position(
-            constraints.position_type, constraints.positions, self.number.value)
+        self.position = Position(constraints, self.number.value)
+
+    def __repr__(self):
+        return f"Configuration(number={self.number!r}, position={self.position!r})"
 
     def sample(self, constraints):
         self.number.sample(constraints)
@@ -171,18 +204,18 @@ class Configuration:
 
     def sample_unique(self, constraints, history):
         current_positions_set = set(self.position.setting)
-        if current_positions_set not in history.position[self.number.value].sampled:
+        if current_positions_set not in history.position[
+                self.number.value].sampled:
             history.position[self.number.value].available -= 1
             history.position[self.number.value].sampled.append(
                 current_positions_set)
         while True:
-            number_setting = self.number.sample_unique(
-                constraints, record=False)
+            number_setting = self.number.sample_unique(constraints,
+                                                       record=False)
             if history.position[number_setting].available == 0:
                 continue
             position_setting = self.position.sample_unique(
-                self.number.value_of_setting(
-                    number_setting), record=False)
+                self.number.value_of_setting(number_setting), record=False)
             positions_set = set(position_setting)
             if positions_set not in history.position[number_setting].sampled:
                 history.position[number_setting].available -= 1
@@ -202,13 +235,14 @@ class Type(UniqueSampleable):
 
     def __init__(self, constraints):
         super(Type, self).__init__(name=AttributeType.TYPE,
-                                   values=TYPE_VALUES, constraints=constraints)
+                                   values=TYPE_VALUES,
+                                   constraints=constraints)
 
 
 class Size(UniqueSampleable):
 
     def __init__(self, constraints):
-        super(Type, self).__init__(name=AttributeType.SIZE,
+        super(Size, self).__init__(name=AttributeType.SIZE,
                                    values=SIZE_VALUES,
                                    constraints=constraints)
 

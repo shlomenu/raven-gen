@@ -1,9 +1,12 @@
-from typing import List
+from typing import List, Tuple, Optional, ClassVar
 from enum import Enum, auto
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+import copy
+
 import numpy as np
 
-from configuration import AttributeType, RuleType
+from attribute import AttributeType, COLOR_MIN, COLOR_MAX
+from component import Component
 
 
 class RuleType(Enum):
@@ -18,7 +21,6 @@ class Rule:
     name: RuleType
     attr: AttributeType
     params: List[int]
-    component_idx = field(default=0)
 
     def __post_init__(self):
         if self.params is not None:
@@ -26,6 +28,203 @@ class Rule:
 
     def increment(self):
         pass
+
+
+def apply_rule(rule: Rule,
+               prev_comp: Component,
+               next_comp: Optional[Component] = None) -> Component:
+    """
+    Apply the rule to a component of a panel.
+
+    It is assumed that this method will be called first by 
+    the rule on NUMBER/POSITION attributes, and then by 
+    rules on TYPE, SIZE, or COLOR.  In the first case, `next_panel` 
+    is not provided and all other non-uniform attributes are 
+    resampled to provide variation which may or may not be 
+    overwritten in the application of other rules.  In the 
+    latter case, `next_comp` is provided and differences
+    between it and `prev_comp` are preserved.  
+    """
+    if rule.attr is AttributeType.ANGLE or \
+            rule.attr is AttributeType.UNIFORMITY or \
+            rule.attr not in AttributeType:
+        raise ValueError("unsupported attribute")
+    elif rule.name is RuleType.CONSTANT:
+        if next_comp is None:
+            next_comp = prev_comp
+        return copy.deepcopy(next_comp)
+    elif rule.name is RuleType.PROGRESSION:
+        if next_comp is None:
+            next_comp = prev_comp
+        next_comp = copy.deepcopy(next_comp)
+        if rule.attr is AttributeType.NUMBER:
+            next_comp.config.number.setting += rule.value
+            next_comp.sample(sample_position=True)
+        elif rule.attr is AttributeType.POSITION:
+            next_comp.config.position.setting = (
+                next_comp.config.position.setting +
+                rule.value) % next_comp.config.position.values.shape[0]
+            next_comp.set_position()
+        else:
+            if rule.previous_is_col_0 and not prev_comp.uniformity.value:
+                prev_comp.make_uniform(rule.attr)
+            next_comp.set_uniform(rule.attr,
+                                  prev_comp.setting_of(rule.attr) + rule.value)
+    elif rule.name is RuleType.ARITHMETIC:
+        if rule.attr is AttributeType.TYPE:
+            raise ValueError("unsupported attribute")
+        if next_comp is None:
+            next_comp = prev_comp
+        next_comp = copy.deepcopy(next_comp)
+        if rule.attr is AttributeType.NUMBER:
+            if rule.col_0_setting is None:  # second column
+                rule.col_0_setting = prev_comp.config.number.setting
+                rule.set_constraints_col_1(prev_comp, next_comp)
+                next_comp.config.number.sample(next_comp.constraints)
+            else:  # third column
+                next_comp.config.number.setting = rule.col_2_setting(
+                    prev_comp.config.number.setting)
+            next_comp.sample(sample_position=True)
+        elif rule.attr is AttributeType.POSITION:
+            if rule.col_0_setting is None:  # second column
+                rule.col_0_setting = prev_comp.config.position.setting
+                rule.set_constraints_col_1(prev_comp, next_comp)
+            else:  # third column
+                col_2_setting = rule.col_2_setting(
+                    prev_comp.config.position.setting)
+                next_comp.config.number.setting = len(col_2_setting) - 1
+                next_comp.config.position.setting = np.array(col_2_setting)
+            next_comp.sample()
+        elif rule.attr is AttributeType.SIZE:
+            if rule.col_0_setting is None:  # second column
+                prev_setting = prev_comp.setting_of(rule.attr)
+                rule.col_0_setting = prev_setting
+                if not prev_comp.uniformity.value:
+                    prev_comp.make_uniform(rule.attr)
+                rule.set_constraints_col_1(prev_comp, next_comp)
+                next_comp.attr(rule.attr).sample(next_comp.constraints)
+                next_comp.make_uniform(rule.attr)
+            else:  # third column
+                next_comp.set_uniform(
+                    rule.attr,
+                    rule.col_2_setting(prev_comp.setting_of(rule.attr)))
+        elif rule.attr is AttributeType.COLOR:
+            rule.color_count += 1
+            if rule.col_0_setting is None:
+                # The arithmetic rule faces the challenge that the second
+                #  panel setting could be 0, in which case plus and minus
+                #  are not distinguishable.  This is handled for NUMBER and
+                #  SIZE by adding an offset of 1 to the addend/subtrahend
+                #  The original authors didn't like this solution here.
+                #  They may have wanted to ensure white was still used.
+                #  So instead the (1, 1) color is resampled if the
+                #  (1, 0) color is extreme and the same extreme
+                #  value (white) appeared in (0, 1).
+                prev_setting = prev_comp.setting_of(rule.attr)
+                reset_previous = False
+                if rule.color_count == 3 and rule.color_white_alarm and \
+                    ((rule.value > 0 and prev_setting == COLOR_MAX) or
+                        (rule.value < 0 and prev_setting == COLOR_MIN)):
+                    prev_comp.attr(rule.attr).sample_unique(
+                        prev_comp.constraints,
+                        prev_comp.history,
+                        record=True,
+                        overwrite=True)
+                    prev_setting = prev_comp.setting_of(rule.attr)
+                    reset_previous = True
+                rule.col_0_setting = prev_setting
+                if reset_previous or not prev_comp.uniformity.value:
+                    prev_comp.make_uniform(rule.attr)
+                rule.set_constraints_col_1(prev_comp, next_comp)
+                next_comp.attr(rule.attr).sample(next_comp.constraints)
+                if rule.color_count == 1:
+                    rule.color_white_alarm = (next_comp.setting_of(
+                        rule.attr) == 0)
+                elif rule.color_count == 3 and rule.color_white_alarm and \
+                        next_comp.setting_of(rule.attr) == 0:
+                    next_comp.attr(rule.attr).sample_unique(
+                        next_comp.constraints,
+                        next_comp.history,
+                        record=True,
+                        overwrite=True)
+                next_comp.make_uniform(rule.attr)
+            else:  # third column
+                next_comp.set_uniform(
+                    rule.attr,
+                    rule.col_2_setting(prev_comp.setting_of(rule.attr)))
+    elif rule.name is RuleType.DISTRIBUTE_THREE:
+        if next_comp is None:
+            next_comp = prev_comp
+        next_comp = copy.deepcopy(next_comp)
+        if rule.attr is AttributeType.NUMBER:
+            if rule.count == 0:  # first row
+                rule.create_settings(
+                    np.insert(
+                        np.random.choice(
+                            list(
+                                range(prev_comp.constraints.number.min,
+                                      prev_comp.config.number.setting)) +
+                            list(
+                                range(prev_comp.config.number.setting + 1,
+                                      prev_comp.constraints.number.max + 1)),
+                            size=2,
+                            replace=False), 0,
+                        prev_comp.config.number.setting))
+                next_comp.config.number.setting = rule.settings[0][1]
+            else:
+                row, col = divmod(rule.count, 2)
+                if col == 0:
+                    prev_comp.config.number.setting = rule.settings[row][0]
+                    prev_comp.sample(sample_position=True)
+                    next_comp = copy.deepcopy(prev_comp)
+                    next_comp.config.number.setting = rule.settings[row][1]
+                else:
+                    next_comp.config.number.setting = rule.settings[row][2]
+            next_comp.sample(sample_position=True)
+        elif rule.attr is AttributeType.POSITION:
+            if rule.count == 0:
+                rule.create_settings(
+                    np.array([
+                        prev_comp.config.position.setting,
+                        prev_comp.config.position.sample_unique(
+                            prev_comp.config.number.value, prev_comp.history),
+                        prev_comp.config.position.sample_unique(
+                            prev_comp.config.number.value, prev_comp.history)
+                    ]))
+                next_comp.config.position.setting = rule.settings[0][1]
+            else:
+                row, col = divmod(rule.count, 2)
+                if col == 0:
+                    prev_comp.config.position.setting = rule.settings[row][0]
+                    prev_comp.sample()
+                    next_comp = copy.deepcopy(prev_comp)
+                    next_comp.config.position.setting = rule.settings[row][1]
+                else:
+                    next_comp.config.position.setting = rule.settings[row][2]
+            next_comp.sample()
+        else:
+
+            def attr_of(x):
+                return getattr(x, rule.attr.name.lower())
+
+            if rule.count == 0:
+                rule.create_settings(
+                    np.random.choice(a=range(
+                        attr_of(prev_comp.constraints).min,
+                        attr_of(prev_comp.constraints).max + 1),
+                                     size=3,
+                                     replace=False))
+                prev_comp.set_uniform(rule.attr, rule.settings[0][0])
+                next_comp.set_uniform(rule.attr, rule.settings[0][1])
+            else:
+                row, col = divmod(rule.count, 2)
+                if col == 0:
+                    prev_comp.set_uniform(rule.attr, rule.settings[row][0])
+                    next_comp.set_uniform(rule.attr, rule.settings[row][1])
+                else:
+                    next_comp.set_uniform(rule.attr, rule.settings[row][2])
+    rule.increment()
+    return next_comp
 
 
 @dataclass
@@ -70,7 +269,10 @@ class Arithmetic(Rule):
                     if not (set(self.col_0_setting) <= set(col_1_setting)):
                         return
         else:
-            def attr_of(x): return getattr(x, self.attr.name.lower())
+
+            def attr_of(x):
+                return getattr(x, self.attr.name.lower())
+
             next_constraint = attr_of(next_comp.constraints)
             prev_constraint = attr_of(prev_comp.constraints)
             if self.value > 0:
@@ -89,11 +291,9 @@ class Arithmetic(Rule):
         col_0_setting = self.pop()
         if self.attr is AttributeType.POSITION:
             if self.value > 0:
-                return list(
-                    set(col_0_setting) | set(col_1_setting))
+                return list(set(col_0_setting) | set(col_1_setting))
             else:
-                return list(
-                    set(col_0_setting) - set(col_1_setting))
+                return list(set(col_0_setting) - set(col_1_setting))
         else:
             offset = 0 if self.attr is AttributeType.COLOR else 1
             if self.value > 0:
@@ -141,56 +341,56 @@ class ComponentRules:
 @dataclass
 class Rules:
     components_rules: List[ComponentRules]
+    default_rulesets: ClassVar[List[List[Tuple[RuleType, AttributeType]]]] = [
+        [(RuleType.PROGRESSION, AttributeType.NUMBER),
+         (RuleType.PROGRESSION, AttributeType.POSITION),
+         (RuleType.ARITHMETIC, AttributeType.NUMBER),
+         (RuleType.ARITHMETIC, AttributeType.POSITION),
+         (RuleType.DISTRIBUTE_THREE, AttributeType.NUMBER),
+         (RuleType.DISTRIBUTE_THREE, AttributeType.POSITION),
+         (RuleType.CONSTANT, AttributeType.CONFIGURATION)],
+        [(RuleType.PROGRESSION, AttributeType.TYPE),
+         (RuleType.DISTRIBUTE_THREE, AttributeType.TYPE),
+         (RuleType.CONSTANT, AttributeType.TYPE)],
+        [(RuleType.PROGRESSION, AttributeType.SIZE),
+         (RuleType.ARITHMETIC, AttributeType.SIZE),
+         (RuleType.DISTRIBUTE_THREE, AttributeType.SIZE),
+         (RuleType.CONSTANT, AttributeType.SIZE)],
+        [(RuleType.PROGRESSION, AttributeType.COLOR),
+         (RuleType.ARITHMETIC, AttributeType.COLOR),
+         (RuleType.DISTRIBUTE_THREE, AttributeType.COLOR),
+         (RuleType.CONSTANT, AttributeType.COLOR)]
+    ]
 
     def __post_init__(self):
-        assert (len(self.components_rules) ==
-                1 or len(self.components_rules) == 2)
-
-    @property
-    def rulesets(self):
-        if hasattr(self, "_rulesets"):
-            return self._rulesets
-        else:
-            self._rulesets = [
-                [[RuleType.PROGRESSION, AttributeType.NUMBER],
-                 [RuleType.PROGRESSION, AttributeType.POSITION],
-                 [RuleType.ARITHMETIC, AttributeType.NUMBER],
-                 [RuleType.ARITHMETIC, AttributeType.POSITION],
-                 [RuleType.DISTRIBUTE_THREE, AttributeType.NUMBER],
-                 [RuleType.DISTRIBUTE_THREE, AttributeType.POSITION],
-                 [RuleType.CONSTANT, AttributeType.CONFIGURATION]],
-                [[RuleType.PROGRESSION, AttributeType.TYPE],
-                 [RuleType.DISTRIBUTE_THREE, AttributeType.TYPE],
-                 [RuleType.CONSTANT, AttributeType.TYPE]],
-                [[RuleType.PROGRESSION, AttributeType.SIZE],
-                 [RuleType.ARITHMETIC, AttributeType.SIZE],
-                 [RuleType.DISTRIBUTE_THREE, AttributeType.SIZE],
-                 [RuleType.CONSTANT, AttributeType.SIZE]],
-                [[RuleType.PROGRESSION, AttributeType.COLOR],
-                 [RuleType.ARITHMETIC, AttributeType.COLOR],
-                 [RuleType.DISTRIBUTE_THREE, AttributeType.COLOR],
-                 [RuleType.CONSTANT, AttributeType.COLOR]]]
+        assert (len(self.components_rules) == 1
+                or len(self.components_rules) == 2)
 
     @staticmethod
-    def make_rule(ruleset, c):
+    def make_rule(ruleset):
         name, attr = ruleset[np.random.choice(len(ruleset))]
         if name is RuleType.CONSTANT:
-            return Constant(name, attr, params=None, component_idx=c)
+            return Constant(name, attr, params=None)
         elif name is RuleType.PROGRESSION:
-            return Progression(name, attr, params=[-2, -1, 1, 2], component_idx=c)
+            return Progression(
+                name,
+                attr,
+                params=[-2, -1, 1, 2],
+            )
         elif name is RuleType.ARITHMETIC:
-            return Arithmetic(name, attr, params=[1, -1], component_idx=c)
+            return Arithmetic(name, attr, params=[1, -1])
         elif name is RuleType.DISTRIBUTE_THREE:
-            return DistributeThree(name, attr, params=None, component_idx=c)
+            return DistributeThree(name, attr, params=None)
         else:
             raise ValueError("unknown rule type")
 
-    def make_random(self):
+    @staticmethod
+    def make_random(n_components, rulesets=None):
+        if rulesets is None:
+            rulesets = Rules.default_rulesets
         return Rules([
-            ComponentRules([
-                Rules.make_rule(ruleset, c) for ruleset in self.rulesets
-            ])
-            for c in range(np.random.randint(1, 3))
+            ComponentRules([Rules.make_rule(ruleset) for ruleset in rulesets])
+            for _ in range(n_components)
         ])
 
     def __iter__(self):
