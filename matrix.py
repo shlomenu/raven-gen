@@ -33,109 +33,110 @@ class MatrixType(Enum):
 class Matrix:
 
     @classmethod
-    def make(cls, matrix_type: MatrixType):
-        return getattr(cls, "make_" + matrix_type.name.lower())()
+    def make(cls, matrix_type: MatrixType, rulesets=None):
+        return getattr(cls,
+                       "make_" + matrix_type.name.lower())(rulesets=rulesets)
 
     @classmethod
-    def make_center_single(cls):
-        return cls(
-            StructureType.SINGLETON,
-            Panel(
-                make_component(component_type=ComponentType.GRID,
-                               layout_type=LayoutType.CENTER_SINGLE,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.5,
-                                                  y_c=0.5,
-                                                  max_w=1,
-                                                  max_h=1)
-                               ],
-                               number_min=0,
-                               number_max=0,
-                               type_min=1)))
+    def make_center_single(cls, rulesets=None):
+        return cls(StructureType.SINGLETON,
+                   Panel(
+                       make_component(component_type=ComponentType.GRID,
+                                      layout_type=LayoutType.CENTER_SINGLE,
+                                      position_type=PositionType.PLANAR,
+                                      positions=[
+                                          PlanarPosition(x_c=0.5,
+                                                         y_c=0.5,
+                                                         max_w=1,
+                                                         max_h=1)
+                                      ],
+                                      number_min=0,
+                                      number_max=0,
+                                      type_min=1)),
+                   rulesets=rulesets)
 
     @classmethod
-    def make_distribute_four(cls):
-        return cls(
-            StructureType.SINGLETON,
-            Panel(
-                make_component(component_type=ComponentType.GRID,
-                               layout_type=LayoutType.DISTRIBUTE_FOUR,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.25,
-                                                  y_c=0.25,
-                                                  max_w=0.5,
-                                                  max_h=0.5),
-                                   PlanarPosition(x_c=0.25,
-                                                  y_c=0.75,
-                                                  max_w=0.5,
-                                                  max_h=0.5),
-                                   PlanarPosition(x_c=0.75,
-                                                  y_c=0.25,
-                                                  max_w=0.5,
-                                                  max_h=0.5),
-                                   PlanarPosition(x_c=0.75,
-                                                  y_c=0.75,
-                                                  max_w=0.5,
-                                                  max_h=0.5)
-                               ],
-                               number_min=0,
-                               number_max=3,
-                               type_min=1)))
+    def make_distribute_four(cls, rulesets=None):
+        return cls(StructureType.SINGLETON,
+                   Panel(
+                       make_component(component_type=ComponentType.GRID,
+                                      layout_type=LayoutType.DISTRIBUTE_FOUR,
+                                      position_type=PositionType.PLANAR,
+                                      positions=[
+                                          PlanarPosition(x_c=0.25,
+                                                         y_c=0.25,
+                                                         max_w=0.5,
+                                                         max_h=0.5),
+                                          PlanarPosition(x_c=0.25,
+                                                         y_c=0.75,
+                                                         max_w=0.5,
+                                                         max_h=0.5),
+                                          PlanarPosition(x_c=0.75,
+                                                         y_c=0.25,
+                                                         max_w=0.5,
+                                                         max_h=0.5),
+                                          PlanarPosition(x_c=0.75,
+                                                         y_c=0.75,
+                                                         max_w=0.5,
+                                                         max_h=0.5)
+                                      ],
+                                      number_min=0,
+                                      number_max=3,
+                                      type_min=1)),
+                   rulesets=rulesets)
 
     @classmethod
-    def make_distribute_nine(cls):
-        return cls(
-            StructureType.SINGLETON,
-            Panel(
-                make_component(component_type=ComponentType.GRID,
-                               layout_type=LayoutType.DISTRIBUTE_NINE,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.16,
-                                                  y_c=0.16,
-                                                  max_w=0.33,
-                                                  max_h=0.33),
-                                   PlanarPosition(x_c=0.16,
-                                                  y_c=0.5,
-                                                  max_w=0.33,
-                                                  max_h=0.33),
-                                   PlanarPosition(x_c=0.16,
-                                                  y_c=0.83,
-                                                  max_w=0.33,
-                                                  max_h=0.33),
-                                   PlanarPosition(x_c=0.5,
-                                                  y_c=0.16,
-                                                  max_w=0.33,
-                                                  max_h=0.33),
-                                   PlanarPosition(x_c=0.5,
-                                                  y_c=0.5,
-                                                  max_w=0.33,
-                                                  max_h=0.33),
-                                   PlanarPosition(x_c=0.5,
-                                                  y_c=0.83,
-                                                  max_w=0.33,
-                                                  max_h=0.33),
-                                   PlanarPosition(x_c=0.83,
-                                                  y_c=0.16,
-                                                  max_w=0.33,
-                                                  max_h=0.33),
-                                   PlanarPosition(x_c=0.83,
-                                                  y_c=0.5,
-                                                  max_w=0.33,
-                                                  max_h=0.33),
-                                   PlanarPosition(x_c=0.83,
-                                                  y_c=0.83,
-                                                  max_w=0.33,
-                                                  max_h=0.33)
-                               ],
-                               number_min=0,
-                               number_max=8,
-                               type_min=1)))
+    def make_distribute_nine(cls, rulesets=None):
+        return cls(StructureType.SINGLETON,
+                   Panel(
+                       make_component(component_type=ComponentType.GRID,
+                                      layout_type=LayoutType.DISTRIBUTE_NINE,
+                                      position_type=PositionType.PLANAR,
+                                      positions=[
+                                          PlanarPosition(x_c=0.16,
+                                                         y_c=0.16,
+                                                         max_w=0.33,
+                                                         max_h=0.33),
+                                          PlanarPosition(x_c=0.16,
+                                                         y_c=0.5,
+                                                         max_w=0.33,
+                                                         max_h=0.33),
+                                          PlanarPosition(x_c=0.16,
+                                                         y_c=0.83,
+                                                         max_w=0.33,
+                                                         max_h=0.33),
+                                          PlanarPosition(x_c=0.5,
+                                                         y_c=0.16,
+                                                         max_w=0.33,
+                                                         max_h=0.33),
+                                          PlanarPosition(x_c=0.5,
+                                                         y_c=0.5,
+                                                         max_w=0.33,
+                                                         max_h=0.33),
+                                          PlanarPosition(x_c=0.5,
+                                                         y_c=0.83,
+                                                         max_w=0.33,
+                                                         max_h=0.33),
+                                          PlanarPosition(x_c=0.83,
+                                                         y_c=0.16,
+                                                         max_w=0.33,
+                                                         max_h=0.33),
+                                          PlanarPosition(x_c=0.83,
+                                                         y_c=0.5,
+                                                         max_w=0.33,
+                                                         max_h=0.33),
+                                          PlanarPosition(x_c=0.83,
+                                                         y_c=0.83,
+                                                         max_w=0.33,
+                                                         max_h=0.33)
+                                      ],
+                                      number_min=0,
+                                      number_max=8,
+                                      type_min=1)),
+                   rulesets=rulesets)
 
     @classmethod
-    def make_left_center_single_right_center_single(cls):
+    def make_left_center_single_right_center_single(cls, rulesets=None):
         return cls(
             StructureType.LEFT_RIGHT,
             Panel(
@@ -162,125 +163,129 @@ class Matrix:
                                ],
                                number_min=0,
                                number_max=0,
-                               type_min=1)))
+                               type_min=1)),
+            rulesets=rulesets)
 
     @classmethod
-    def make_up_center_single_down_center_single(cls):
-        return cls(
-            StructureType.UP_DOWN,
-            Panel(
-                make_component(component_type=ComponentType.UP,
-                               layout_type=LayoutType.UP_CENTER_SINGLE,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.25,
-                                                  y_c=0.5,
-                                                  max_w=0.5,
-                                                  max_h=0.5)
-                               ],
-                               number_min=0,
-                               number_max=0,
-                               type_min=1),
-                make_component(component_type=ComponentType.DOWN,
-                               layout_type=LayoutType.DOWN_CENTER_SINGLE,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.75,
-                                                  y_c=0.5,
-                                                  max_w=0.5,
-                                                  max_h=0.5)
-                               ],
-                               number_min=0,
-                               number_max=0,
-                               type_min=1)))
+    def make_up_center_single_down_center_single(cls, rulesets=None):
+        return cls(StructureType.UP_DOWN,
+                   Panel(
+                       make_component(component_type=ComponentType.UP,
+                                      layout_type=LayoutType.UP_CENTER_SINGLE,
+                                      position_type=PositionType.PLANAR,
+                                      positions=[
+                                          PlanarPosition(x_c=0.25,
+                                                         y_c=0.5,
+                                                         max_w=0.5,
+                                                         max_h=0.5)
+                                      ],
+                                      number_min=0,
+                                      number_max=0,
+                                      type_min=1),
+                       make_component(
+                           component_type=ComponentType.DOWN,
+                           layout_type=LayoutType.DOWN_CENTER_SINGLE,
+                           position_type=PositionType.PLANAR,
+                           positions=[
+                               PlanarPosition(x_c=0.75,
+                                              y_c=0.5,
+                                              max_w=0.5,
+                                              max_h=0.5)
+                           ],
+                           number_min=0,
+                           number_max=0,
+                           type_min=1)),
+                   rulesets=rulesets)
 
     @classmethod
-    def make_in_center_single_out_center_single(cls):
-        return cls(
-            StructureType.OUT_IN,
-            Panel(
-                make_component(component_type=ComponentType.OUT,
-                               layout_type=LayoutType.OUT_CENTER_SINGLE,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.5,
-                                                  y_c=0.5,
-                                                  max_w=1,
-                                                  max_h=1)
-                               ],
-                               number_min=0,
-                               number_max=0,
-                               type_min=1,
-                               size_min=3,
-                               color_max=0),
-                make_component(component_type=ComponentType.IN,
-                               layout_type=LayoutType.IN_CENTER_SINGLE,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.5,
-                                                  y_c=0.5,
-                                                  max_w=0.33,
-                                                  max_h=0.33)
-                               ],
-                               number_min=0,
-                               number_max=0,
-                               type_min=1)))
+    def make_in_center_single_out_center_single(cls, rulesets=None):
+        return cls(StructureType.OUT_IN,
+                   Panel(
+                       make_component(component_type=ComponentType.OUT,
+                                      layout_type=LayoutType.OUT_CENTER_SINGLE,
+                                      position_type=PositionType.PLANAR,
+                                      positions=[
+                                          PlanarPosition(x_c=0.5,
+                                                         y_c=0.5,
+                                                         max_w=1,
+                                                         max_h=1)
+                                      ],
+                                      number_min=0,
+                                      number_max=0,
+                                      type_min=1,
+                                      size_min=3,
+                                      color_max=0),
+                       make_component(component_type=ComponentType.IN,
+                                      layout_type=LayoutType.IN_CENTER_SINGLE,
+                                      position_type=PositionType.PLANAR,
+                                      positions=[
+                                          PlanarPosition(x_c=0.5,
+                                                         y_c=0.5,
+                                                         max_w=0.33,
+                                                         max_h=0.33)
+                                      ],
+                                      number_min=0,
+                                      number_max=0,
+                                      type_min=1)),
+                   rulesets=rulesets)
 
     @classmethod
-    def make_in_distribute_four_out_center_single(cls):
-        return cls(
-            StructureType.OUT_IN,
-            Panel(
-                make_component(component_type=ComponentType.OUT,
-                               layout_type=LayoutType.OUT_CENTER_SINGLE,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.5,
-                                                  y_c=0.5,
-                                                  max_w=1,
-                                                  max_h=1)
-                               ],
-                               number_min=0,
-                               number_max=0,
-                               type_min=1,
-                               size_min=3,
-                               color_max=0),
-                make_component(component_type=ComponentType.IN,
-                               layout_type=LayoutType.IN_DISTRIBUTE_FOUR,
-                               position_type=PositionType.PLANAR,
-                               positions=[
-                                   PlanarPosition(x_c=0.42,
-                                                  y_c=0.42,
-                                                  max_w=0.15,
-                                                  max_h=0.15),
-                                   PlanarPosition(x_c=0.42,
-                                                  y_c=0.58,
-                                                  max_w=0.15,
-                                                  max_h=0.15),
-                                   PlanarPosition(x_c=0.58,
-                                                  y_c=0.42,
-                                                  max_w=0.15,
-                                                  max_h=0.15),
-                                   PlanarPosition(x_c=0.58,
-                                                  y_c=0.58,
-                                                  max_w=0.15,
-                                                  max_h=0.15)
-                               ],
-                               number_min=0,
-                               number_max=3,
-                               type_min=1,
-                               size_min=2)))
+    def make_in_distribute_four_out_center_single(cls, rulesets=None):
+        return cls(StructureType.OUT_IN,
+                   Panel(
+                       make_component(component_type=ComponentType.OUT,
+                                      layout_type=LayoutType.OUT_CENTER_SINGLE,
+                                      position_type=PositionType.PLANAR,
+                                      positions=[
+                                          PlanarPosition(x_c=0.5,
+                                                         y_c=0.5,
+                                                         max_w=1,
+                                                         max_h=1)
+                                      ],
+                                      number_min=0,
+                                      number_max=0,
+                                      type_min=1,
+                                      size_min=3,
+                                      color_max=0),
+                       make_component(
+                           component_type=ComponentType.IN,
+                           layout_type=LayoutType.IN_DISTRIBUTE_FOUR,
+                           position_type=PositionType.PLANAR,
+                           positions=[
+                               PlanarPosition(x_c=0.42,
+                                              y_c=0.42,
+                                              max_w=0.15,
+                                              max_h=0.15),
+                               PlanarPosition(x_c=0.42,
+                                              y_c=0.58,
+                                              max_w=0.15,
+                                              max_h=0.15),
+                               PlanarPosition(x_c=0.58,
+                                              y_c=0.42,
+                                              max_w=0.15,
+                                              max_h=0.15),
+                               PlanarPosition(x_c=0.58,
+                                              y_c=0.58,
+                                              max_w=0.15,
+                                              max_h=0.15)
+                           ],
+                           number_min=0,
+                           number_max=3,
+                           type_min=1,
+                           size_min=2)),
+                   rulesets=rulesets)
 
-    def __init__(self, structure_type, base):
+    def __init__(self, structure_type, base, rulesets=None):
         self.structure_type = structure_type
         self.initial_constraints = tuple(
             copy.deepcopy(comp.constraints) for comp in base.components)
-        self.make_ground_truth(base)
+        self.make_ground_truth(base, rulesets=rulesets)
         self.make_decoys()
 
-    def make_ground_truth(self, base):
+    def make_ground_truth(self, base, rulesets=None):
         while True:
-            self.rules = Rules.make_random(n_components=len(base.components))
+            self.rules = Rules.make_random(n_components=len(base.components),
+                                           rulesets=None)
             pruned = prune(base, self.rules)
             self.start = copy.deepcopy(
                 pruned) if pruned is not None else pruned
