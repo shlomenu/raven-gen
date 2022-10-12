@@ -273,6 +273,8 @@ class Matrix:
 
     def __init__(self, structure_type, base):
         self.structure_type = structure_type
+        self.initial_constraints = tuple(
+            copy.deepcopy(comp.constraints) for comp in base.components)
         self.make_ground_truth(base)
         self.make_decoys()
 
@@ -283,8 +285,6 @@ class Matrix:
             self.start = copy.deepcopy(
                 pruned) if pruned is not None else pruned
             if self.start is not None:
-                for component in base.components:
-                    component.reset_constraints()
                 break
 
         panels = []
@@ -298,14 +298,14 @@ class Matrix:
     def make_decoys(self):
         self.modifications = self.count_modifiable()
         self.uniques = [
-            AttributeHistory(comp.initial_constraints)
-            for comp in self.answer.components
+            AttributeHistory(cst) for cst in self.initial_constraints
         ]
         self.alternatives = []
         for _ in range(2):
             c, attr = self.sample_modification()
             alternative = copy.deepcopy(self.answer)
-            alternative.components[c].sample_unique(attr, self.uniques[c])
+            alternative.components[c].sample_unique(
+                attr, self.uniques[c], self.initial_constraints[c])
             self.alternatives.append(alternative)
 
         self.alternatives_imgs = [
@@ -332,20 +332,17 @@ class Matrix:
         return [Panel(comp_1, comp_2) for (comp_1, comp_2) in zip(*comp_rows)]
 
     def count_modifiable(self) -> List[list]:
-        """
-        Sample available attributes whose values could be modified.
-        :returns: list of [component_idx, attribute, available_times, constraints]
-        """
         samples = []
-        for c, (component, component_rules) in enumerate(
-                zip(self.answer.components, self.rules)):
+        for c, (component, component_rules, initial_constraints) in enumerate(
+                zip(self.answer.components, self.rules,
+                    self.initial_constraints)):
             n_samples, max_entities = 0, component.config.position.values.shape[
                 0]
             for n_entities in range(
                     component.config.number.value_of_setting(
-                        component.initial_constraints.number.min),
+                        initial_constraints.number.min),
                     component.config.number.value_of_setting(
-                        component.initial_constraints.number.max) + 1):
+                        initial_constraints.number.max) + 1):
                 if n_entities != component.config.number.value:
                     n_samples += comb(max_entities, n_entities)
             if n_samples > 0:
@@ -362,7 +359,7 @@ class Matrix:
                     component_rules.number_or_position.name is RuleType.CONSTANT or \
                     (component_rules.number_or_position.attr is AttributeType.POSITION and
                      component_rules.number_or_position.name is not RuleType.ARITHMETIC):
-                    bounds = getattr(component.initial_constraints,
+                    bounds = getattr(initial_constraints,
                                      rule.attr.name.lower())
                     n_samples = bounds.max - bounds.min  # excludes one setting
                     if not component.uniformity.value:
@@ -372,11 +369,6 @@ class Matrix:
         return samples
 
     def sample_modification(self):
-        """
-        Sample an attribute from a list of sampleable attributes and reduce this attributes count
-        of available samples by one; if this reduces the count to zero, remove this entry from
-        the list.
-        """
         i = np.random.choice(len(self.modifications))
         component_idx, attr_name, available_samples = self.modifications[i]
         if available_samples - 1 == 0:
@@ -421,11 +413,6 @@ class Matrix:
         return s
 
     def generate_matrix(self, last_panel_img):
-        """
-        Merge nine panels into 3x3 grid.
-        :param panels: list of nine ndarrays in left-to-right, top-to-bottom order
-        :returns: merged ndarray
-        """
         img_grid = np.zeros((IMAGE_SIZE * 3, IMAGE_SIZE * 3), np.uint8)
         for pos, panel in enumerate(self.context_imgs + [last_panel_img]):
             i, j = divmod(pos, 3)

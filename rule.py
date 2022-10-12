@@ -34,18 +34,6 @@ class Rule:
 def apply_rule(rule: Rule,
                prev_comp: Component,
                next_comp: Optional[Component] = None) -> Component:
-    """
-    Apply the rule to a component of a panel.
-
-    It is assumed that this method will be called first by 
-    the rule on NUMBER/POSITION attributes, and then by 
-    rules on TYPE, SIZE, or COLOR.  In the first case, `next_panel` 
-    is not provided and all other non-uniform attributes are 
-    resampled to provide variation which may or may not be 
-    overwritten in the application of other rules.  In the 
-    latter case, `next_comp` is provided and differences
-    between it and `prev_comp` are preserved.  
-    """
     if next_comp is None:
         next_comp = prev_comp
     if rule.attr is AttributeType.ANGLE or \

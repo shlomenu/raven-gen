@@ -162,9 +162,9 @@ class Component:
                 for i, bbox in enumerate(self.config.position.value)
             ]
 
-    def sample_unique(self, attr, history):
+    def sample_unique(self, attr, history, initial_constraints):
         if attr is AttributeType.NUMBER:
-            self.config.sample_unique(self.initial_constraints,
+            self.config.sample_unique(initial_constraints,
                                       history,
                                       inplace=True)
             self.sample(carryover=False)
@@ -179,21 +179,18 @@ class Component:
                 f"unsupported operation on attribute of type: {attr!s}")
         elif attr in AttributeType:
             if self.uniformity.value:
-                self.attr(attr).sample_unique(self.initial_constraints,
+                self.attr(attr).sample_unique(initial_constraints,
                                               history,
                                               inplace=True)
                 self.make_uniform(attr)
             else:
                 for entity in self.entities:
                     entity_attr = getattr(entity, attr.name.lower())
-                    entity_attr.sample_unique(self.initial_constraints,
+                    entity_attr.sample_unique(initial_constraints,
                                               history,
                                               inplace=True)
         else:
             raise ValueError("unsupported operation")
-
-    def reset_constraints(self):
-        self.constraints = copy.deepcopy(self.initial_constraints)
 
 
 def make_component(component_type,

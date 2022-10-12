@@ -138,15 +138,6 @@ class AngularPosition:
 
 
 class Position(Attribute):
-    """
-    Stores the (im/proper) subset of bounding boxes available in a layout
-    that are currently occupied by this layout's entities.  `Position` instances
-    are tightly-coupled with corresponding `Number` instances, which are used to
-    determine the size of the subset.  A `Position` instance may consist of
-    bounding boxes that encode rotation information (`AngularPosition`s) or
-    bounding boxes which do not (`PlanarPosition`s).  Handles boundaries in
-    a more complex way and implements `sample` and `sample_new`.
-    """
 
     def __init__(self, constraints, n_entities: int):
         self.position_type = constraints.position_type
@@ -204,6 +195,9 @@ class Configuration:
         self.position = Position(constraints, self.number.value)
 
     def __repr__(self):
+        return f"Configuration(number={self.number!r}, position={self.position!r})"
+
+    def __str__(self):
         return f"Configuration(number={self.number!r}, position={self.position!r})"
 
     def sample(self, constraints):
