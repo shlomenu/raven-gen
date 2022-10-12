@@ -55,7 +55,7 @@ class Entity:
         self.color.sample(constraints)
         self.angle.sample(constraints)
 
-    def render_entity(self):
+    def render(self):
         img = np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)
         center = Point(y=int(self.bbox.y_c * IMAGE_SIZE),
                        x=int(self.bbox.x_c * IMAGE_SIZE))
@@ -70,7 +70,7 @@ class Entity:
             ], [
                 center.y + int(dl / 2.0 * np.sqrt(3)), center.x + int(dl / 2.0)
             ], [
-                center.x - int(dl / 2.0 * np.sqrt(3)), center.x + int(dl / 2.0)
+                center.y - int(dl / 2.0 * np.sqrt(3)), center.x + int(dl / 2.0)
             ]], np.int32).reshape((-1, 1, 2))
             if color != 0:  # filled
                 cv2.fillConvexPoly(img, pts, color)  # fill the interior

@@ -1,9 +1,10 @@
 from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
-from typing import List, Union, Dict, NamedTuple
+from typing import List, Union, Dict, Set
 from collections import namedtuple
 from enum import Enum, auto
+from matplotlib.style import available
 
 import numpy as np
 from scipy.special import comb
@@ -38,18 +39,22 @@ class LayoutType(Enum):
     IN_DISTRIBUTE_FOUR = auto()
 
 
+@dataclass
+class PositionHistory:
+    available: int
+    sampled: List[Set[int]]
+
+
 @dataclass(init=False)
 class AttributeHistory:
     number: List[int]
-    position: Dict[int, NamedTuple[int, List[np.ndarray]]]
+    position: Dict[int, PositionHistory]
     type: List[int]
     size: List[int]
     color: List[int]
     angle: List[int]
 
     def __init__(self, constraints):
-        PositionHistory = namedtuple("PositionHistory",
-                                     ["available", "sampled"])
         self.number = []
         self.position = {}
         self.type = []
@@ -157,43 +162,35 @@ class Component:
                 for i, bbox in enumerate(self.config.position.value)
             ]
 
-    def sample_unique(self, attr, ground_truth):
+    def sample_unique(self, attr, history):
         if attr is AttributeType.NUMBER:
             self.config.sample_unique(self.initial_constraints,
-                                      ground_truth.history,
-                                      record=True,
-                                      overwrite=True)
-            self.sample(sample_position=True, carryover=False)
+                                      history,
+                                      inplace=True)
+            self.sample(carryover=False)
         elif attr is AttributeType.POSITION:
             self.config.position.sample_unique(self.config.number.value,
-                                               ground_truth.history,
-                                               record=True,
-                                               overwrite=True)
+                                               history,
+                                               inplace=True)
             self.set_position()
         elif attr is AttributeType.ANGLE or \
                 attr is AttributeType.UNIFORMITY:
             raise ValueError(
                 f"unsupported operation on attribute of type: {attr!s}")
         elif attr in AttributeType:
-
-            def sample_attr_unique(e, attr):
-                attr = getattr(e, attr.name.lower())
-                attr.sample_unique(self.initial_constraints,
-                                   ground_truth.history,
-                                   record=True,
-                                   overwrite=True)
-
             if self.uniformity.value:
-                sample_attr_unique(self.entities[0], attr)
+                self.attr(attr).sample_unique(self.initial_constraints,
+                                              history,
+                                              inplace=True)
                 self.make_uniform(attr)
             else:
                 for entity in self.entities:
-                    sample_attr_unique(entity, attr)
+                    entity_attr = getattr(entity, attr.name.lower())
+                    entity_attr.sample_unique(self.initial_constraints,
+                                              history,
+                                              inplace=True)
         else:
             raise ValueError("unsupported operation")
-
-    def reset_history(self):
-        self.history = AttributeHistory(self.initial_constraints)
 
     def reset_constraints(self):
         self.constraints = copy.deepcopy(self.initial_constraints)

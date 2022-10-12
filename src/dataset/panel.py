@@ -19,6 +19,18 @@ class Panel:
         else:
             self.components = (self.component_1, )
 
+    def __str__(self):
+        s = f"{self.component_1.config}\n{self.component_1.uniformity}\n\n"
+        for entity in self.component_1.entities:
+            s += f"{entity!r}\n"
+        if hasattr(self, "component_2"):
+            s += "\n\t----------- COMP -----------\n\n"
+            s += f"{self.component_2.config}\n{self.component_2.uniformity}\n"
+            for entity in self.component_2.entities:
+                s += f"{entity!r}\n"
+        s += "\n"
+        return s
+
 
 def prune(base: Panel, rules: Rules) -> Optional[Panel]:
     """
@@ -27,6 +39,13 @@ def prune(base: Panel, rules: Rules) -> Optional[Panel]:
     range of values; if this cannot be done by tightening bounds, returns None.
     If rules cannot be applied, the panel is reset such that `self.constraints`
     does not differ from its state before the method was called.
+
+    Note that the bounds in base.components[i].constraints.number are the maximal
+    and minimal number of objects that may be placed in this layout.  In particular,
+
+        base.components[i].constraints.number == \
+            base.components[i].config.position.value.shape[0]
+     
     """
     pruned = copy.deepcopy(base)
     for component, component_rules in zip(pruned.components, rules):
@@ -45,14 +64,8 @@ def prune(base: Panel, rules: Rules) -> Optional[Panel]:
                 initial_min, initial_max = bounds.min, bounds.max
                 if rule.name is RuleType.PROGRESSION:
                     if rule.attr is AttributeType.POSITION:
-                        # bounds.max is setting indicating number of positions
-                        # in this layout;
-                        #
+                        # can increment/decrement layout slot indices twice without repetition:
                         #   bounds.max >= bounds.min + 2 * abs(rule.value)
-                        #
-                        # ensures that entities can be shifted `rule.value`
-                        # positions over before landing in a position that
-                        # was occupied within the row.
                         bounds.max = bounds.max - 2 * abs(rule.value)
                     elif bounds:
                         # bounds.max >= bounds.min + 2 * rule.value
@@ -62,10 +75,7 @@ def prune(base: Panel, rules: Rules) -> Optional[Panel]:
                             bounds.min = bounds.min - 2 * rule.value
                 elif rule.name is RuleType.ARITHMETIC:
                     if rule.attr is AttributeType.POSITION:
-                        # Forbid filling all positions so that set union
-                        #  appears different from constancy; disallow the
-                        #  sampling of disjoint subsets so that set difference
-                        #  is visible.
+                        # sets must be incomplete (union) and overlapping (difference)
                         if rule.value <= 0:
                             bounds.min = bounds.max // 2
                         bounds.max = bounds.max - 1
@@ -86,21 +96,20 @@ def prune(base: Panel, rules: Rules) -> Optional[Panel]:
                             bounds.min = 2 * bounds.min
                 elif rule.name is RuleType.DISTRIBUTE_THREE:
                     if rule.attr is AttributeType.POSITION:
-                        # There are n choose k sets of positions in which to
-                        # place k entities within a panel containing at most
-                        # n entities (n is initially given by `bounds.max + 1`).
-                        # Since the lowest setting of number corresponds to one
-                        # entity, k >= 1.  If we restrict n >= 3 and k < n, then
-                        # n choose k >= 3, as is required to apply the rule.
-                        if bounds.max + 1 < 3:
+                        # n choose k entity arrangements in layout with n slots;
+                        # `value_of_setting(bounds.min)` >= 1 and we restrict
+                        # n >= 3 and k < n so n choose k >= 3 (see Pascal's triangle).
+                        n_slots = component.config.number.value_of_setting(
+                            bounds.max)
+                        if n_slots < 3:
                             return None
                         else:
                             bounds.max = bounds.max - 1
                     elif bounds:
-                        # require three distinct settings
+                        # u - l + 1 settings in [u, l]: require >= 3
                         if bounds.max - bounds.min + 1 < 3:
                             return None
-                if bounds.max < bounds.min:
+                if bounds.max < bounds.min:  # reset bounds if pruned
                     bounds.min, bounds.max = initial_min, initial_max
                     return None
             else:

@@ -88,11 +88,7 @@ class Sampleable(Attribute):
 
 class UniqueSampleable(Sampleable):
 
-    def sample_unique(self,
-                      constraints,
-                      history,
-                      record=True,
-                      overwrite=False):
+    def sample_unique(self, constraints, history, record=True, inplace=False):
         constraint = getattr(constraints, self.name.name.lower())
         previous_settings = getattr(history, self.name.name.lower())
         all_settings = range(constraint.min, constraint.max + 1)
@@ -104,7 +100,7 @@ class UniqueSampleable(Sampleable):
             if self.setting not in previous_settings:
                 previous_settings.append(self.setting)
             previous_settings.append(new_setting)
-        if overwrite:
+        if inplace:
             self.setting = new_setting
         return new_setting
 
@@ -164,23 +160,35 @@ class Position(Attribute):
                                         size=size,
                                         replace=False)
 
-    def sample_unique(self, size, history, record=True, overwrite=False):
+    def record_setting(self, history, setting, positions_set=None):
         position_history = getattr(history, self.name.name.lower())
-        if self.setting not in position_history[len(self.setting)].sampled:
-            position_history[len(self.setting)].sampled.append(self.setting)
+        position_history[len(setting)].available -= 1
+        position_history[len(setting)].sampled.append(
+            set(setting) if positions_set is None else positions_set)
+
+    def sample_unique(self, size, history, record=True, inplace=False):
+        position_history = getattr(history, self.name.name.lower())
         new_setting = np.random.choice(self.values.shape[0],
                                        size=size,
                                        replace=False)
         while True:
-            nobreak = True
-            for sampled_setting in position_history[size].sampled:
-                if set(new_setting) == set(sampled_setting):
-                    nobreak = False
-                    break
-            if nobreak:
+            unique, new_positions_set = True, set(new_setting)
+            current_positions_set = set(self.setting)
+            if new_positions_set in position_history[size].sampled or \
+               new_positions_set == current_positions_set:
+                unique = False
+            if unique:
                 if record:
-                    position_history[size].sampled.append(new_setting)
-                if overwrite:
+                    if current_positions_set not in position_history[len(
+                            self.setting)].sampled:
+                        self.record_setting(
+                            history,
+                            self.setting,
+                            positions_set=current_positions_set)
+                    self.record_setting(history,
+                                        new_setting,
+                                        positions_set=new_positions_set)
+                if inplace:
                     self.setting = new_setting
                 return new_setting
             else:
@@ -202,29 +210,32 @@ class Configuration:
         self.number.sample(constraints)
         self.position.sample(self.number.value)
 
-    def sample_unique(self, constraints, history):
-        current_positions_set = set(self.position.setting)
-        if current_positions_set not in history.position[
-                self.number.value].sampled:
-            history.position[self.number.value].available -= 1
-            history.position[self.number.value].sampled.append(
-                current_positions_set)
+    def sample_unique(self, constraints, history, inplace=False):
         while True:
             number_setting = self.number.sample_unique(constraints,
+                                                       history,
                                                        record=False)
-            if history.position[number_setting].available == 0:
+            number_value = self.number.value_of_setting(number_setting)
+            if history.position[number_value].available == 0:
                 continue
-            position_setting = self.position.sample_unique(
-                self.number.value_of_setting(number_setting), record=False)
-            positions_set = set(position_setting)
-            if positions_set not in history.position[number_setting].sampled:
-                history.position[number_setting].available -= 1
+            position_setting = self.position.sample_unique(number_value,
+                                                           history,
+                                                           record=False)
+            position_setting_set = set(position_setting)
+            if position_setting_set not in history.position[
+                    number_value].sampled:
+                self.position.record_setting(history, self.position.setting)
+                self.position.record_setting(
+                    history,
+                    position_setting,
+                    positions_set=position_setting_set)
+                if self.number.setting not in history.number:
+                    history.number.append(self.number.setting)
                 history.number.append(number_setting)
-                history.position[number_setting].sampled.append(
-                    position_setting)
-                self.number.setting = number_setting
-                self.position.setting = position_setting
-                return number_setting, position_setting
+                if inplace:
+                    self.number.setting = number_setting
+                    self.position.setting = position_setting
+                return self.number.setting, self.position.setting
 
     def reset(self):
         self.number.reset()
