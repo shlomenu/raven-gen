@@ -26,7 +26,7 @@ I do not offer assurances that the code in this repository functions identically
 
 # Goals
 
-The original code used to generate the RAVEN dataset did not offer suitable abstractions for generating RPM problems in close-coordination with other programs.  Reasons for wanting more programmatically-friendly RPM generation code include: custom specifications for RPMs, on-demand generation for testing data efficiency-related metrics.  With the included modules, one can
+The original code used to generate the RAVEN dataset did not offer convenient abstractions for calling RPM generation routines from within other programs.  The `Matrix` class makes it easy to generate RPM problems on demand and to customize the specification of an RPM problem.  For example:
 
 ```
 >> from matrix import Matrix
@@ -39,7 +39,7 @@ The original code used to generate the RAVEN dataset did not offer suitable abst
 ...    f.write(str(rpm.rules))
 ```
 
-where the `MatrixType` enumeration includes the expected seven branches:
+The `MatrixType` enumeration includes the expected seven branches:
 - `CENTER_SINGLE`
 - `DISTRIBUTE_FOUR`
 - `DISTRIBUTE_NINE`
@@ -58,7 +58,7 @@ The `rulesets` parameter of `Matrix.make` may be `None` or may be omitted.  Cust
 
 where no inner list is empty.
 
-To generate at most `N_ALTERNATIVES` wrong answers (fewer if there are not more modifications possible), `Matrix.make_alternatives` must be called.  `Matrix.save` may be called with or without a prior call to `Matrix.make_alternatives`.  `Matrix.make_alternatives` may be called any number of times, but overwrites the results of previous calls.  
+To generate at most `N_ALTERNATIVES` wrong answers (fewer if there are not more modifications possible), `Matrix.make_alternatives` must be called.  `Matrix.save` may be called with or without a prior call to `Matrix.make_alternatives`.  `Matrix.make_alternatives` overwrites the results of previous calls and may be called any number of times.  
 
 The call to `Matrix.save` results in `PUZZLENAME_answer.png` and `PUZZLENAME_alternative_{i}.png` files being created in the specified directory.  These images show a completed Raven's progressive matrix with either the correct answer or the `i`th alternative (incorrect) answer as the ninth (bottom-right) panel.  This data format is intended for a binary prediction task rather than the task of picking the right completion out of a lineup.  As such, we do not implement the alternative sampling mechanisms of the balanced RAVEN dataset or similar improvement efforts. 
 
