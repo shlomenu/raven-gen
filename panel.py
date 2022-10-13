@@ -24,11 +24,11 @@ class Panel:
         for entity in self.component_1.entities:
             s += f"{entity!r}\n"
         if hasattr(self, "component_2"):
-            s += "\n\t----------- COMP -----------\n\n"
+            s += f"\n\t----------- \\\\ {self.component_1.component_type.name} > {self.component_1.layout_type.name} // --- " + \
+                 f"// {self.component_2.component_type.name} > {self.component_2.layout_type.name} \\\\ -----------\n\n"
             s += f"{self.component_2.config}\n{self.component_2.uniformity}\n"
             for entity in self.component_2.entities:
                 s += f"{entity!r}\n"
-        s += "\n"
         return s
 
 

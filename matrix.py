@@ -280,7 +280,6 @@ class Matrix:
         self.initial_constraints = tuple(
             copy.deepcopy(comp.constraints) for comp in base.components)
         self.make_ground_truth(base, rulesets=rulesets)
-        self.make_decoys()
 
     def make_ground_truth(self, base, rulesets=None):
         while True:
@@ -300,13 +299,15 @@ class Matrix:
         self.context_imgs = [self.render(panel) for panel in self.context]
         self.answer_img = self.render(self.answer)
 
-    def make_decoys(self):
+    def make_alternatives(self, n_alternatives):
         self.modifications = self.count_modifiable()
         self.uniques = [
             AttributeHistory(cst) for cst in self.initial_constraints
         ]
         self.alternatives = []
-        for _ in range(2):
+        for _ in range(n_alternatives):
+            if len(self.modifications) == 0:
+                break
             c, attr = self.sample_modification()
             alternative = copy.deepcopy(self.answer)
             alternative.components[c].sample_unique(
@@ -403,17 +404,17 @@ class Matrix:
         return canvas - background
 
     def __str__(self):
-        s = "\n"
+        s = f"\nstructure: {self.structure_type.name}:\n"
         for i, panel in enumerate(self.context):
-            if i != 0 and (i % 3) == 0:
-                s += "\t+++++++++++ ROW +++++++++++\n\n"
+            if (i % 3) == 0:
+                s += "\n\t+++++++++++ ROW +++++++++++\n\n"
             elif i != 0:
-                s += "\t*********** PANEL ***********\n\n"
+                s += "\n\t*********** PANEL ***********\n\n"
             s += str(panel)
-        s += "\t*********** SOLUTION ***********\n\n"
+        s += "\n\t*********** SOLUTION ***********\n\n"
         s += str(self.answer)
         for alternative in self.alternatives:
-            s += "\t*********** ALTERNATIVE ***********\n\n"
+            s += "\n\t*********** ALTERNATIVE ***********\n\n"
             s += str(alternative)
         return s
 

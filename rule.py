@@ -392,7 +392,7 @@ class Rules:
         s = "\n"
         for c, comp_rules in enumerate(self):
             for rule in comp_rules.all:
-                s += f"\t{rule!r} w/ value: {rule.value if hasattr(rule, 'value') else None}\n"
+                s += f"{rule!r} w/ value: {rule.value if hasattr(rule, 'value') else None}\n"
             if c == 0 and len(self) > 1:
-                s += "\n\t----------- COMP -----------\n\n"
+                s += "\n\t----------- \\\\ ... // --- // ... \\\\ -----------\n\n"
         return s
