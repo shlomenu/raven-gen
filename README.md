@@ -22,11 +22,11 @@ Dramatic progress has been witnessed in basic vision tasks involving low-level p
 
 # Scientific Replication
 
-I do not offer assurances that the code in this repository functions identically to the code in the original authors repository, or that the performance of models on data generated with this code may be directly and fairly compared to the performance of models on the published RAVEN dataset of Zhang et al. (2019).  Authors who utilize this code to generate data and wish to compare model performance against that of models trained with the original RAVEN dataset should offer support for the fairness of this comparison and/or replicate previous results as appropriate.
+I do not offer assurances that the code in this repository functions identically to the code in the original author's repository, or that the performance of models on data generated with this code may be directly and fairly compared to the performance of models on the published RAVEN dataset of Zhang et al. (2019).  Authors who utilize this code to generate data and wish to compare model performance against that of models trained with the original RAVEN dataset should offer support for the fairness of this comparison and/or replicate previous results as appropriate.
 
 # Goals
 
-THe original code used to generate the RAVEN dataset did not offer suitable abstractions for generating RPM problems in close-coordination with other programs.  Reasons for wanting more programmatically-friendly RPM generation code include: custom specifications for RPMs, on-demand generation for testing data efficiency-related metrics.  With the included modules, one can
+The original code used to generate the RAVEN dataset did not offer suitable abstractions for generating RPM problems in close-coordination with other programs.  Reasons for wanting more programmatically-friendly RPM generation code include: custom specifications for RPMs, on-demand generation for testing data efficiency-related metrics.  With the included modules, one can
 
 ```
 >> from matrix import Matrix
