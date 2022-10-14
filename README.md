@@ -1,4 +1,4 @@
-# raven-tool
+# raven-gen
 
 This repo contains a rewrite of the data-generation code originating from the CVPR paper:
 
@@ -33,6 +33,8 @@ The original code used to generate the RAVEN dataset did not offer convenient ab
 >> rpm = Matrix.make(MatrixType.BRANCH, rulesets)
 >> rpm.make_alternatives(N_ALTERNATIVES)
 >> rpm.save("path/to/data/dir", "PUZZLENAME")
+>> print(rpm)
+>> print(rpm.rules)
 >> with open("path/to/meta/dir/PUZZLENAME_rpm.txt") as f:
 ...    f.write(str(rpm))
 >> with open("path/to/meta/dir/PUZZLENAME_rules.txt") as f:

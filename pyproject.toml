@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "raven_gen"
+version = "0.4"
+authors = [
+    { name = "Eli Whitehouse", email = "eliw55@gmail.com" },
+]
+description = "A tool for programmatic and customizable generation of Raven's Progressive Matrices in the style of the RAVEN dataset"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/shlomenu/raven-gen"

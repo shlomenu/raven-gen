@@ -1,11 +1,10 @@
-from typing import Union, List
-from enum import Enum, auto
+from typing import Union
 from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
 
-from attribute import (Type, Size, Color, Angle, Shape, PlanarPosition,
+from .attribute import (Type, Size, Color, Angle, Shape, PlanarPosition,
                        AngularPosition)
 
 

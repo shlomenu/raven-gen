@@ -5,8 +5,8 @@ import copy
 
 import numpy as np
 
-from attribute import AttributeType, COLOR_MIN, COLOR_MAX
-from component import Component
+from .attribute import AttributeType, COLOR_MIN, COLOR_MAX
+from .component import Component
 
 
 class RuleType(Enum):

@@ -2,18 +2,16 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
 from typing import List, Union, Dict, Set
-from collections import namedtuple
 from enum import Enum, auto
-from matplotlib.style import available
 
 import numpy as np
 from scipy.special import comb
 
-from attribute import (AttributeType, Uniformity, Configuration, PositionType,
+from .attribute import (AttributeType, Uniformity, Configuration, PositionType,
                        AngularPosition, PlanarPosition, NUM_MIN, NUM_MAX,
                        TYPE_MIN, TYPE_MAX, SIZE_MIN, SIZE_MAX, COLOR_MIN,
                        COLOR_MAX, ANGLE_MIN, ANGLE_MAX, UNI_MIN, UNI_MAX)
-from entity import Entity
+from .entity import Entity
 
 
 class ComponentType(Enum):

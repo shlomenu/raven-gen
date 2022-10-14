@@ -1,9 +1,9 @@
 from typing import Optional
 import copy
 
-from attribute import AttributeType
-from component import Component
-from rule import Rules, RuleType
+from .attribute import AttributeType
+from .component import Component
+from .rule import Rules, RuleType
 
 
 class Panel:

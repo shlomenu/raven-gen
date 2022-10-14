@@ -6,11 +6,11 @@ import numpy as np
 from scipy.special import comb
 from PIL import Image
 
-from entity import IMAGE_SIZE
-from component import make_component, ComponentType, LayoutType, AttributeHistory
-from panel import Panel, prune
-from attribute import AttributeType, PositionType, PlanarPosition
-from rule import Rules, RuleType, apply_rule
+from .entity import IMAGE_SIZE
+from .component import make_component, ComponentType, LayoutType, AttributeHistory
+from .panel import Panel, prune
+from .attribute import AttributeType, PositionType, PlanarPosition
+from .rule import Rules, RuleType, apply_rule
 
 
 class StructureType(Enum):
