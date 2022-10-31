@@ -32,7 +32,7 @@ The original code used to generate the RAVEN dataset did not offer convenient ab
 >> from matrix import Matrix
 >> rpm = Matrix.make(MatrixType.BRANCH, rulesets)
 >> rpm.make_alternatives(N_ALTERNATIVES)
->> rpm.save("path/to/data/dir", "PUZZLENAME")
+>> rpm.save("path/to/data/dir", "PUZZLENAME", background_color=255)
 >> print(rpm)
 >> print(rpm.rules)
 >> with open("path/to/meta/dir/PUZZLENAME_rpm.txt") as f:

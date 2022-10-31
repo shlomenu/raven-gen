@@ -383,9 +383,9 @@ class Matrix:
         entities = []
         for component in panel.components:
             entities.extend(component.entities)
-        panel_img = np.ones((IMAGE_SIZE, IMAGE_SIZE), np.uint8) * background_color
+        panel_img = np.ones((IMAGE_SIZE, IMAGE_SIZE), np.uint8) * (255 - background_color)
         for entity in entities:
-            entity_img = entity.render(background_color)
+            entity_img = entity.render(255 - background_color)
             panel_img[entity_img != background_color] = 0
             entity_img[entity_img == background_color] = 0
             panel_img += entity_img

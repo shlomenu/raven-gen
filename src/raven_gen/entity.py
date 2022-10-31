@@ -56,7 +56,7 @@ class Entity:
         self.angle.sample(constraints)
 
     def render(self, background_color):
-        img = np.ones((IMAGE_SIZE, IMAGE_SIZE), np.uint8) * background_color
+        img = np.ones((IMAGE_SIZE, IMAGE_SIZE), np.uint8) * (255 - background_color)
         center = Point(y=int(self.bbox.y_c * IMAGE_SIZE),
                        x=int(self.bbox.x_c * IMAGE_SIZE))
         unit = min(self.bbox.max_w, self.bbox.max_h) * IMAGE_SIZE // 2
@@ -72,7 +72,7 @@ class Entity:
             ], [
                 center.y - int(dl / 2.0 * np.sqrt(3)), center.x + int(dl / 2.0)
             ]], np.int32).reshape((-1, 1, 2))
-            if color != background_color:  # filled
+            if color != (255 - background_color):  # filled
                 cv2.fillConvexPoly(img, pts, color)  # fill the interior
                 cv2.polylines(img, [pts], True, 255, width)  # draw the edge
             else:  # not filled
@@ -81,7 +81,7 @@ class Entity:
             dl = int(unit / 2 * np.sqrt(2) * self.size.value)
             pt1 = (center.y - dl, center.x - dl)
             pt2 = (center.y + dl, center.x + dl)
-            if color != background_color:
+            if color != (255 - background_color):
                 cv2.rectangle(img, pt1, pt2, color, -1)
                 cv2.rectangle(img, pt1, pt2, 255, width)
             else:
@@ -105,7 +105,7 @@ class Entity:
                                 center.y + int(dl * np.cos(np.pi / 10)),
                                 center.x - int(dl * np.sin(np.pi / 10))
                             ]], np.int32).reshape((-1, 1, 2))
-            if color != background_color:
+            if color != (255 - background_color):
                 cv2.fillConvexPoly(img, pts, color)
                 cv2.polylines(img, [pts], True, 255, width)
             else:
@@ -125,14 +125,14 @@ class Entity:
             ], [
                 center.y + int(dl / 2.0 * np.sqrt(3)), center.x - int(dl / 2.0)
             ]], np.int32).reshape((-1, 1, 2))
-            if color != background_color:
+            if color != (255 - background_color):
                 cv2.fillConvexPoly(img, pts, color)
                 cv2.polylines(img, [pts], True, 255, width)
             else:
                 cv2.polylines(img, [pts], True, 255, width)
         elif self.type.value is Shape.CIRCLE:
             radius = int(unit * self.size.value)
-            if color != background_color:
+            if color != (255 - background_color):
                 cv2.circle(img, tuple(center), radius, color, -1)
                 cv2.circle(img, tuple(center), radius, 255, width)
             else:
@@ -142,11 +142,11 @@ class Entity:
         if isinstance(self.bbox, AngularPosition):
             img = rotate(img,
                          self.bbox.omega,
-                         background_color,
+                         (255 - background_color),
                          center=Point(x=(self.bbox.x_r * IMAGE_SIZE),
                                       y=(self.bbox.y_r * IMAGE_SIZE)))
         elif isinstance(self.bbox, PlanarPosition):
-            img = rotate(img, self.angle.value, background_color, center=center)
+            img = rotate(img, self.angle.value, (255 - background_color), center=center)
         else:
             raise ValueError("unknown position type: not angular or planar")
         return img
