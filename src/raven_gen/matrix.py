@@ -284,7 +284,7 @@ class Matrix:
     def make_ground_truth(self, base, rulesets=None):
         while True:
             self.rules = Rules.make_random(n_components=len(base.components),
-                                           rulesets=None)
+                                           rulesets=rulesets)
             pruned = prune(base, self.rules)
             self.start = copy.deepcopy(
                 pruned) if pruned is not None else pruned
@@ -296,8 +296,6 @@ class Matrix:
             panels.extend(self.make_row())
 
         self.context, self.answer = panels[:-1], panels[-1]
-        self.context_imgs = [self.render(panel) for panel in self.context]
-        self.answer_img = self.render(self.answer)
 
     def make_alternatives(self, n_alternatives):
         self.modifications = self.count_modifiable()
@@ -314,9 +312,6 @@ class Matrix:
                 attr, self.uniques[c], self.initial_constraints[c])
             self.alternatives.append(alternative)
 
-        self.alternatives_imgs = [
-            self.render(panel) for panel in self.alternatives
-        ]
 
     def make_row(self):
         col_0 = copy.deepcopy(self.start)
@@ -383,25 +378,22 @@ class Matrix:
             self.modifications[i][2] = available_samples - 1
         return component_idx, attr_name
 
-    def render(self, panel):
+    def render(self, panel, background_color):
         canvas = np.ones((IMAGE_SIZE, IMAGE_SIZE), np.uint8) * 255
         entities = []
         for component in panel.components:
             entities.extend(component.entities)
-        background = np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)
-        # left components entities are in the lower layer
+        panel_img = np.ones((IMAGE_SIZE, IMAGE_SIZE), np.uint8) * background_color
         for entity in entities:
-            entity_img = entity.render()
-            background[entity_img > 0] = 0
-            background += entity_img
-        structure_img = np.zeros((IMAGE_SIZE, IMAGE_SIZE), np.uint8)
+            entity_img = entity.render(background_color)
+            panel_img[entity_img != background_color] = 0
+            entity_img[entity_img == background_color] = 0
+            panel_img += entity_img
         if self.structure_type is StructureType.LEFT_RIGHT:
-            structure_img[:, int(0.5 * IMAGE_SIZE)] = 255.0
+            panel_img[:, int(0.5 * IMAGE_SIZE)] = 255.0
         elif self.structure_type is StructureType.UP_DOWN:
-            structure_img[int(0.5 * IMAGE_SIZE), :] = 255.0
-        background[structure_img > 0] = 0
-        background += structure_img
-        return canvas - background
+            panel_img[int(0.5 * IMAGE_SIZE), :] = 255.0
+        return canvas - panel_img
 
     def __str__(self):
         s = f"\nstructure: {self.structure_type.name}:\n"
@@ -418,9 +410,11 @@ class Matrix:
             s += str(alternative)
         return s
 
-    def generate_matrix(self, last_panel_img):
-        img_grid = np.zeros((IMAGE_SIZE * 3, IMAGE_SIZE * 3), np.uint8)
-        for pos, panel in enumerate(self.context_imgs + [last_panel_img]):
+    def generate_matrix(self, last_panel, background_color):
+        img_grid = np.ones((IMAGE_SIZE * 3, IMAGE_SIZE * 3), np.uint8) * background_color
+        for pos, panel in enumerate([
+                self.render(panel, background_color) for panel in self.context] + [
+                self.render(last_panel, background_color)]):
             i, j = divmod(pos, 3)
             img_grid[i * IMAGE_SIZE:(i + 1) * IMAGE_SIZE,
                      j * IMAGE_SIZE:(j + 1) * IMAGE_SIZE] = panel
@@ -432,9 +426,9 @@ class Matrix:
             img_grid[:, band_center - 1:band_center + 1] = 0
         return Image.fromarray(img_grid)
 
-    def save(self, path, puzzle_name):
-        img = self.generate_matrix(self.answer_img)
+    def save(self, path, puzzle_name, background_color):
+        img = self.generate_matrix(self.answer, background_color)
         img.save(os.path.join(path, puzzle_name + "_answer.png"))
-        for i, alternative_img in enumerate(self.alternatives_imgs):
-            img = self.generate_matrix(alternative_img)
+        for i, alternative in enumerate(self.alternatives):
+            img = self.generate_matrix(alternative, background_color)
             img.save(os.path.join(path, puzzle_name + f"_alternative_{i}.png"))
