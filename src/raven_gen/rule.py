@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional, ClassVar
+from typing import Iterable, List, Optional, Tuple
 from enum import Enum, auto
 from dataclasses import dataclass, field
 import copy
@@ -6,7 +6,7 @@ import copy
 import numpy as np
 
 from .attribute import AttributeType, COLOR_MIN, COLOR_MAX
-from .component import Component
+from .component import Component, ComponentType, LayoutType
 
 
 class RuleType(Enum):
@@ -64,7 +64,7 @@ def apply_rule(rule: Rule,
             next_comp.set_uniform(rule.attr,
                                   prev_comp.setting_of(rule.attr) + rule.value)
     elif rule.name is RuleType.ARITHMETIC:
-        if rule.attr is AttributeType.TYPE:
+        if rule.attr is AttributeType.SHAPE:
             raise ValueError("unsupported attribute")
         next_comp = copy.deepcopy(next_comp)
         if rule.attr is AttributeType.NUMBER:
@@ -310,73 +310,25 @@ class DistributeThree(Rule):
 
 @dataclass
 class ComponentRules:
-    all: List[Rule]
+    configuration: Rule
+    shape: Rule
+    size: Rule
+    color: Rule
+    component_type: ComponentType
+    layout_type: LayoutType
 
     def __post_init__(self):
-        assert (len(self.all) == 4)
-        self.number_or_position, self.type, self.size, self.color = \
-            self.all
-        self.secondary = [self.type, self.size, self.color]
+        self.all = (self.configuration, self.shape, self.size, self.color)
+        self.secondary = self.all[1:]
 
     def __iter__(self):
         for rule in self.secondary:
             yield rule
 
 
-@dataclass
+@dataclass(frozen=True)
 class Rules:
-    components_rules: List[ComponentRules]
-    default_rulesets: ClassVar[List[List[Tuple[RuleType, AttributeType]]]] = [
-        [(RuleType.PROGRESSION, AttributeType.NUMBER),
-         (RuleType.PROGRESSION, AttributeType.POSITION),
-         (RuleType.ARITHMETIC, AttributeType.NUMBER),
-         (RuleType.ARITHMETIC, AttributeType.POSITION),
-         (RuleType.DISTRIBUTE_THREE, AttributeType.NUMBER),
-         (RuleType.DISTRIBUTE_THREE, AttributeType.POSITION),
-         (RuleType.CONSTANT, AttributeType.CONFIGURATION)],
-        [(RuleType.PROGRESSION, AttributeType.TYPE),
-         (RuleType.DISTRIBUTE_THREE, AttributeType.TYPE),
-         (RuleType.CONSTANT, AttributeType.TYPE)],
-        [(RuleType.PROGRESSION, AttributeType.SIZE),
-         (RuleType.ARITHMETIC, AttributeType.SIZE),
-         (RuleType.DISTRIBUTE_THREE, AttributeType.SIZE),
-         (RuleType.CONSTANT, AttributeType.SIZE)],
-        [(RuleType.PROGRESSION, AttributeType.COLOR),
-         (RuleType.ARITHMETIC, AttributeType.COLOR),
-         (RuleType.DISTRIBUTE_THREE, AttributeType.COLOR),
-         (RuleType.CONSTANT, AttributeType.COLOR)]
-    ]
-
-    def __post_init__(self):
-        assert (len(self.components_rules) == 1
-                or len(self.components_rules) == 2)
-
-    @staticmethod
-    def make_rule(ruleset):
-        name, attr = ruleset[np.random.choice(len(ruleset))]
-        if name is RuleType.CONSTANT:
-            return Constant(name, attr, params=None)
-        elif name is RuleType.PROGRESSION:
-            return Progression(
-                name,
-                attr,
-                params=[-2, -1, 1, 2],
-            )
-        elif name is RuleType.ARITHMETIC:
-            return Arithmetic(name, attr, params=[1, -1])
-        elif name is RuleType.DISTRIBUTE_THREE:
-            return DistributeThree(name, attr, params=None)
-        else:
-            raise ValueError("unknown rule type")
-
-    @staticmethod
-    def make_random(n_components, rulesets=None):
-        if rulesets is None:
-            rulesets = Rules.default_rulesets
-        return Rules([
-            ComponentRules([Rules.make_rule(ruleset) for ruleset in rulesets])
-            for _ in range(n_components)
-        ])
+    components_rules: Tuple[ComponentRules]
 
     def __iter__(self):
         for component_rules in self.components_rules:
@@ -392,7 +344,68 @@ class Rules:
         s = "\n"
         for c, comp_rules in enumerate(self):
             for rule in comp_rules.all:
-                s += f"{rule!r} w/ value: {rule.value if hasattr(rule, 'value') else None}\n"
+                s += f"{rule!r}\n"
             if c == 0 and len(self) > 1:
-                s += "\n\t----------- \\\\ ... // --- // ... \\\\ -----------\n\n"
+                s += f"\n\t----------- \\\\ {self[0].component_type.name} > {self[0].layout_type.name} // --- " + \
+                     f"// {self[1].component_type.name} > {self[1].layout_type.name} \\\\ -----------\n\n"
         return s
+
+
+@dataclass
+class Ruleset:
+
+    position_rules: Iterable[RuleType] = None
+    number_rules: Iterable[RuleType] = None
+    shape_rules: Iterable[RuleType] = None
+    size_rules: Iterable[RuleType] = None
+    color_rules: Iterable[RuleType] = None
+
+    def __post_init__(self):
+        for attr_rules in ("position_rules", "number_rules", "shape_rules",
+                           "size_rules", "color_rules"):
+            rules = getattr(self, attr_rules)
+            if rules is None:
+                validated_rules = []
+            else:
+                validated_rules = tuple(rule for rule in rules
+                                        if rule in RuleType)
+            if len(validated_rules) > 0:
+                setattr(self, attr_rules, validated_rules)
+            else:
+                exclusions = {RuleType.ARITHMETIC
+                              } if attr_rules == "shape_rules" else set()
+                setattr(self, attr_rules, tuple(set(RuleType) - exclusions))
+
+    @staticmethod
+    def rule(name, attr):
+        if name is RuleType.CONSTANT:
+            return Constant(name, attr, params=None)
+        elif name is RuleType.PROGRESSION:
+            return Progression(name, attr, params=[-2, -1, 1, 2])
+        elif name is RuleType.ARITHMETIC:
+            return Arithmetic(name, attr, params=[-1, 1])
+        else:  # name is RuleType.DISTRIBUTE_THREE
+            return DistributeThree(name, attr, params=None)
+
+    def sample(self, component_and_layout_types):
+        assert (len(component_and_layout_types) == 1
+                or len(component_and_layout_types) == 2)
+        components_rules = []
+        for component_type, layout_type in component_and_layout_types:
+            name, attr = (np.random.choice(self.position_rules),
+                          AttributeType.POSITION) if np.random.choice(
+                              (True, False)) else (np.random.choice(
+                                  self.number_rules), AttributeType.NUMBER)
+            components_rules.append(
+                ComponentRules(
+                    self.rule(
+                        name, AttributeType.CONFIGURATION
+                        if name is RuleType.CONSTANT else attr),
+                    self.rule(np.random.choice(self.shape_rules),
+                              AttributeType.SHAPE),
+                    self.rule(np.random.choice(self.size_rules),
+                              AttributeType.SIZE),
+                    self.rule(np.random.choice(self.color_rules),
+                              AttributeType.COLOR), component_type,
+                    layout_type))
+        return Rules(tuple(components_rules))

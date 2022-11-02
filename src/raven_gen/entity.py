@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
-from .attribute import (Type, Size, Color, Angle, Shape, PlanarPosition,
-                       AngularPosition)
+from .attribute import (Shape, Size, Color, Angle, Shapes, PlanarPosition,
+                        AngularPosition)
 
 
 @dataclass
@@ -18,25 +18,21 @@ class Point:
             yield getattr(self, attr)
 
 
-IMAGE_SIZE = 160
-CENTER = Point(x=IMAGE_SIZE // 2, y=IMAGE_SIZE // 2)
-DEFAULT_RADIUS = IMAGE_SIZE // 4
-DEFAULT_WIDTH = 2
-
-
-def rotate(img, angle, borderValue, center=CENTER):
+def rotate(img, angle, background_color, panel_size, center=None):
+    if center is None:
+        center = Point(x=(panel_size // 2), y=(panel_size // 2))
     return cv2.warpAffine(img,
                           cv2.getRotationMatrix2D(tuple(center), angle, 1),
-                          (IMAGE_SIZE, IMAGE_SIZE),
+                          (panel_size, panel_size),
                           flags=cv2.INTER_LINEAR,
-                          borderValue=borderValue)
+                          borderValue=background_color)
 
 
 @dataclass(init=False)
 class Entity:
     name: str
     bbox: Union[PlanarPosition, AngularPosition] = field(repr=False)
-    type: Type
+    shape: Shape
     size: Size
     color: Color
     angle: Angle
@@ -44,26 +40,24 @@ class Entity:
     def __init__(self, name, bbox, constraints):
         self.name = name
         self.bbox = bbox
-        self.type = Type(constraints)
+        self.shape = Shape(constraints)
         self.size = Size(constraints)
         self.color = Color(constraints)
         self.angle = Angle(constraints)
 
     def sample(self, constraints):
-        self.type.sample(constraints)
+        self.shape.sample(constraints)
         self.size.sample(constraints)
         self.color.sample(constraints)
         self.angle.sample(constraints)
 
-    def render(self, background_color):
-        img = np.ones((IMAGE_SIZE, IMAGE_SIZE), np.uint8) * (255 - background_color)
-        center = Point(y=int(self.bbox.y_c * IMAGE_SIZE),
-                       x=int(self.bbox.x_c * IMAGE_SIZE))
-        unit = min(self.bbox.max_w, self.bbox.max_h) * IMAGE_SIZE // 2
+    def render(self, background_color, panel_size, shape_border_thickness):
+        img = np.ones((panel_size, panel_size), np.uint8) * background_color
+        center = Point(y=int(self.bbox.y_c * panel_size),
+                       x=int(self.bbox.x_c * panel_size))
+        unit = min(self.bbox.max_w, self.bbox.max_h) * panel_size // 2
         # minus because of the way we show the image, see render_panel's return
-        color = 255 - self.color.value
-        width = DEFAULT_WIDTH
-        if self.type.value is Shape.TRIANGLE:
+        if self.shape.value is Shapes.TRIANGLE:
             dl = int(unit * self.size.value)
             pts = np.array([[
                 center.y, center.x - dl
@@ -72,21 +66,17 @@ class Entity:
             ], [
                 center.y - int(dl / 2.0 * np.sqrt(3)), center.x + int(dl / 2.0)
             ]], np.int32).reshape((-1, 1, 2))
-            if color != (255 - background_color):  # filled
-                cv2.fillConvexPoly(img, pts, color)  # fill the interior
-                cv2.polylines(img, [pts], True, 255, width)  # draw the edge
-            else:  # not filled
-                cv2.polylines(img, [pts], True, 255, width)
-        elif self.type.value is Shape.SQUARE:
+            if self.color.value != background_color:
+                cv2.fillConvexPoly(img, pts, self.color.value)
+            cv2.polylines(img, [pts], True, 0, shape_border_thickness)
+        elif self.shape.value is Shapes.SQUARE:
             dl = int(unit / 2 * np.sqrt(2) * self.size.value)
             pt1 = (center.y - dl, center.x - dl)
             pt2 = (center.y + dl, center.x + dl)
-            if color != (255 - background_color):
-                cv2.rectangle(img, pt1, pt2, color, -1)
-                cv2.rectangle(img, pt1, pt2, 255, width)
-            else:
-                cv2.rectangle(img, pt1, pt2, 255, width)
-        elif self.type.value is Shape.PENTAGON:
+            if self.color.value != background_color:
+                cv2.rectangle(img, pt1, pt2, self.color.value, -1)
+            cv2.rectangle(img, pt1, pt2, 0, shape_border_thickness)
+        elif self.shape.value is Shapes.PENTAGON:
             dl = int(unit * self.size.value)
             pts = np.array([[center.y, center.x - dl],
                             [
@@ -105,12 +95,10 @@ class Entity:
                                 center.y + int(dl * np.cos(np.pi / 10)),
                                 center.x - int(dl * np.sin(np.pi / 10))
                             ]], np.int32).reshape((-1, 1, 2))
-            if color != (255 - background_color):
-                cv2.fillConvexPoly(img, pts, color)
-                cv2.polylines(img, [pts], True, 255, width)
-            else:
-                cv2.polylines(img, [pts], True, 255, width)
-        elif self.type.value is Shape.HEXAGON:
+            if self.color.value != background_color:
+                cv2.fillConvexPoly(img, pts, self.color.value)
+            cv2.polylines(img, [pts], True, 0, shape_border_thickness)
+        elif self.shape.value is Shapes.HEXAGON:
             dl = int(unit * self.size.value)
             pts = np.array([[
                 center.y, center.x - dl
@@ -125,28 +113,28 @@ class Entity:
             ], [
                 center.y + int(dl / 2.0 * np.sqrt(3)), center.x - int(dl / 2.0)
             ]], np.int32).reshape((-1, 1, 2))
-            if color != (255 - background_color):
-                cv2.fillConvexPoly(img, pts, color)
-                cv2.polylines(img, [pts], True, 255, width)
-            else:
-                cv2.polylines(img, [pts], True, 255, width)
-        elif self.type.value is Shape.CIRCLE:
+            if self.color.value != background_color:
+                cv2.fillConvexPoly(img, pts, self.color.value)
+            cv2.polylines(img, [pts], True, 0, shape_border_thickness)
+        elif self.shape.value is Shapes.CIRCLE:
             radius = int(unit * self.size.value)
-            if color != (255 - background_color):
-                cv2.circle(img, tuple(center), radius, color, -1)
-                cv2.circle(img, tuple(center), radius, 255, width)
-            else:
-                cv2.circle(img, tuple(center), radius, 255, width)
-        elif self.type.value is Shape.NONE:
+            if self.color.value != background_color:
+                cv2.circle(img, tuple(center), radius, self.color.value, -1)
+            cv2.circle(img, tuple(center), radius, 0, shape_border_thickness)
+        elif self.shape.value is Shapes.NONE:
             pass
         if isinstance(self.bbox, AngularPosition):
-            img = rotate(img,
-                         self.bbox.omega,
-                         (255 - background_color),
-                         center=Point(x=(self.bbox.x_r * IMAGE_SIZE),
-                                      y=(self.bbox.y_r * IMAGE_SIZE)))
+            return rotate(img,
+                          self.bbox.omega,
+                          background_color,
+                          panel_size,
+                          center=Point(x=(self.bbox.x_r * panel_size),
+                                       y=(self.bbox.y_r * panel_size)))
         elif isinstance(self.bbox, PlanarPosition):
-            img = rotate(img, self.angle.value, (255 - background_color), center=center)
+            return rotate(img,
+                          self.angle.value,
+                          background_color,
+                          panel_size,
+                          center=center)
         else:
             raise ValueError("unknown position type: not angular or planar")
-        return img

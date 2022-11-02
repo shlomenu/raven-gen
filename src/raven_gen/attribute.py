@@ -4,16 +4,16 @@ from enum import Enum, auto
 
 import numpy as np
 
-NUM_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+NUM_VALUES = (1, 2, 3, 4, 5, 6, 7, 8, 9)
 NUM_MIN = 0
 NUM_MAX = len(NUM_VALUES) - 1
 
-UNI_VALUES = [False, False, False, True]
+UNI_VALUES = (False, False, False, True)
 UNI_MIN = 0
 UNI_MAX = len(UNI_VALUES) - 1
 
 
-class Shape(Enum):
+class Shapes(Enum):
     NONE = auto()
     TRIANGLE = auto()
     SQUARE = auto()
@@ -22,26 +22,26 @@ class Shape(Enum):
     CIRCLE = auto()
 
 
-TYPE_VALUES = [t for t in Shape]
-TYPE_MIN = 0
-TYPE_MAX = len(TYPE_VALUES) - 1
+SHAPE_VALUES = tuple(Shapes)
+SHAPE_MIN = 0
+SHAPE_MAX = len(SHAPE_VALUES) - 1
 
-SIZE_VALUES = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+SIZE_VALUES = (0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 SIZE_MIN = 0
 SIZE_MAX = len(SIZE_VALUES) - 1
 
-COLOR_VALUES = [255, 224, 196, 168, 140, 112, 84, 56, 28, 0]
+COLOR_VALUES = (255, 224, 196, 168, 140, 112, 84, 56, 28, 0)
 COLOR_MIN = 0
 COLOR_MAX = len(COLOR_VALUES) - 1
 
-ANGLE_VALUES = [-135, -90, -45, 0, 45, 90, 135, 180]
+ANGLE_VALUES = (-135, -90, -45, 0, 45, 90, 135, 180)
 ANGLE_MIN = 0
 ANGLE_MAX = len(ANGLE_VALUES) - 1
 
 
 class AttributeType(Enum):
     NUMBER = auto()
-    TYPE = auto()
+    SHAPE = auto()
     SIZE = auto()
     COLOR = auto()
     ANGLE = auto()
@@ -236,12 +236,12 @@ class Configuration:
         self.position.reset()
 
 
-class Type(UniqueSampleable):
+class Shape(UniqueSampleable):
 
     def __init__(self, constraints):
-        super(Type, self).__init__(name=AttributeType.TYPE,
-                                   values=TYPE_VALUES,
-                                   constraints=constraints)
+        super(Shape, self).__init__(name=AttributeType.SHAPE,
+                                    values=SHAPE_VALUES,
+                                    constraints=constraints)
 
 
 class Size(UniqueSampleable):

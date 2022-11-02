@@ -8,14 +8,12 @@ import numpy as np
 from scipy.special import comb
 
 from .attribute import (AttributeType, Uniformity, Configuration, PositionType,
-                       AngularPosition, PlanarPosition, NUM_MIN, NUM_MAX,
-                       TYPE_MIN, TYPE_MAX, SIZE_MIN, SIZE_MAX, COLOR_MIN,
-                       COLOR_MAX, ANGLE_MIN, ANGLE_MAX, UNI_MIN, UNI_MAX)
+                        AngularPosition, PlanarPosition)
 from .entity import Entity
 
 
 class ComponentType(Enum):
-    GRID = auto()
+    NONE = auto()
     LEFT = auto()
     RIGHT = auto()
     UP = auto()
@@ -25,16 +23,10 @@ class ComponentType(Enum):
 
 
 class LayoutType(Enum):
-    CENTER_SINGLE = auto()
-    DISTRIBUTE_FOUR = auto()
-    DISTRIBUTE_NINE = auto()
-    LEFT_CENTER_SINGLE = auto()
-    RIGHT_CENTER_SINGLE = auto()
-    UP_CENTER_SINGLE = auto()
-    DOWN_CENTER_SINGLE = auto()
-    OUT_CENTER_SINGLE = auto()
-    IN_CENTER_SINGLE = auto()
-    IN_DISTRIBUTE_FOUR = auto()
+    CENTER = auto()
+    GRID_FOUR = auto()
+    GRID_FIVE = auto()
+    GRID_NINE = auto()
 
 
 @dataclass
@@ -47,7 +39,7 @@ class PositionHistory:
 class AttributeHistory:
     number: List[int]
     position: Dict[int, PositionHistory]
-    type: List[int]
+    shape: List[int]
     size: List[int]
     color: List[int]
     angle: List[int]
@@ -55,7 +47,7 @@ class AttributeHistory:
     def __init__(self, constraints):
         self.number = []
         self.position = {}
-        self.type = []
+        self.shape = []
         self.size = []
         self.color = []
         self.angle = []
@@ -74,7 +66,7 @@ class Bounds:
 @dataclass
 class Constraints:
     number: Bounds
-    type: Bounds
+    shape: Bounds
     size: Bounds
     color: Bounds
     angle: Bounds
@@ -173,8 +165,7 @@ class Component:
             self.set_position()
         elif attr is AttributeType.ANGLE or \
                 attr is AttributeType.UNIFORMITY:
-            raise ValueError(
-                f"unsupported operation on attribute of type: {attr!s}")
+            raise ValueError(f"unsupported operation attribute: {attr!s}")
         elif attr in AttributeType:
             if self.uniformity.value:
                 self.attr(attr).sample_unique(initial_constraints,
@@ -191,28 +182,16 @@ class Component:
             raise ValueError("unsupported operation")
 
 
-def make_component(component_type,
-                   layout_type,
-                   position_type,
-                   positions,
-                   number_min=NUM_MIN,
-                   number_max=NUM_MAX,
-                   type_min=TYPE_MIN,
-                   type_max=TYPE_MAX,
-                   size_min=SIZE_MIN,
-                   size_max=SIZE_MAX,
-                   color_min=COLOR_MIN,
-                   color_max=COLOR_MAX,
-                   angle_min=ANGLE_MIN,
-                   angle_max=ANGLE_MAX,
-                   uniformity_min=UNI_MIN,
-                   uniformity_max=UNI_MAX):
+def make_component(component_type, layout_type, position_type, positions, *,
+                   number_min, number_max, shape_min, shape_max, size_min,
+                   size_max, color_min, color_max, angle_min, angle_max,
+                   uniformity_min, uniformity_max):
     return Component(component_type=component_type,
                      layout_type=layout_type,
                      constraints=Constraints(number=Bounds(min=number_min,
                                                            max=number_max),
-                                             type=Bounds(min=type_min,
-                                                         max=type_max),
+                                             shape=Bounds(min=shape_min,
+                                                          max=shape_max),
                                              size=Bounds(min=size_min,
                                                          max=size_max),
                                              color=Bounds(min=color_min,
