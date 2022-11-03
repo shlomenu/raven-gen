@@ -479,6 +479,8 @@ class Matrix:
              image_size=480,
              line_thickness=3,
              shape_border_thickness=2):
+        image_size, background_color, line_thickness, shape_border_thickness = \
+            int(image_size), int(background_color), int(line_thickness), int(shape_border_thickness)
         img = self.generate_matrix(self.answer, background_color,
                                    image_size // 3, line_thickness,
                                    shape_border_thickness)
