@@ -480,7 +480,8 @@ class Matrix:
              line_thickness=3,
              shape_border_thickness=2):
         image_size, background_color, line_thickness, shape_border_thickness = \
-            int(image_size), int(background_color), int(line_thickness), int(shape_border_thickness)
+            int(abs(image_size)), int(abs(background_color)), int(abs(line_thickness)), int(abs(shape_border_thickness))
+        assert (image_size != 0 and background_color <= 255)
         img = self.generate_matrix(self.answer, background_color,
                                    image_size // 3, line_thickness,
                                    shape_border_thickness)
