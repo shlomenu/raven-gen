@@ -421,15 +421,6 @@ class Matrix:
             panel_img[entity_img != background_color] = 0
             entity_img[entity_img == background_color] = 0
             panel_img += entity_img
-        neg_offset, pos_offset = math.floor(line_thickness / 2), math.ceil(
-            line_thickness / 2)
-        band_center = int(0.5 * panel_size)
-        if self.structure_type is StructureType.LEFT_RIGHT:
-            panel_img[:,
-                      band_center - neg_offset:band_center + pos_offset] = 0.
-        elif self.structure_type is StructureType.UP_DOWN:
-            panel_img[band_center - neg_offset:band_center +
-                      pos_offset, :] = 0.
         return panel_img
 
     def __str__(self):
@@ -447,10 +438,11 @@ class Matrix:
             s += str(alternative)
         return s
 
-    def generate_matrix(self, last_panel, background_color, panel_size,
+    def generate_matrix(self, last_panel, background_color, image_size,
                         line_thickness, shape_border_thickness):
+        panel_size = image_size // 3
         img_grid = np.ones(
-            (panel_size * 3, panel_size * 3), np.uint8) * background_color
+            (image_size, image_size), np.uint8) * background_color
         for pos, panel in enumerate([
                 self.render(panel, background_color, panel_size,
                             line_thickness, shape_border_thickness)
@@ -470,6 +462,16 @@ class Matrix:
         for y in [0.33, 0.67]:
             band_center = int(y * panel_size * 3)
             img_grid[:, band_center - neg_offset:band_center + pos_offset] = 0
+        if self.structure_type is StructureType.LEFT_RIGHT:
+            for i in range(3):
+                band_center = i * panel_size + int(0.5 * panel_size)
+                img_grid[:, band_center - neg_offset:band_center +
+                         pos_offset] = 0.
+        elif self.structure_type is StructureType.UP_DOWN:
+            for i in range(3):
+                band_center = i * panel_size + int(0.5 * panel_size)
+                img_grid[band_center - neg_offset:band_center +
+                         pos_offset, :] = 0.
         return Image.fromarray(img_grid)
 
     def save(self,
@@ -482,12 +484,11 @@ class Matrix:
         image_size, background_color, line_thickness, shape_border_thickness = \
             int(abs(image_size)), int(abs(background_color)), int(abs(line_thickness)), int(abs(shape_border_thickness))
         assert (image_size != 0 and background_color <= 255)
-        img = self.generate_matrix(self.answer, background_color,
-                                   image_size // 3, line_thickness,
-                                   shape_border_thickness)
+        img = self.generate_matrix(self.answer, background_color, image_size,
+                                   line_thickness, shape_border_thickness)
         img.save(os.path.join(path, puzzle_name + "_answer.png"))
         for i, alternative in enumerate(self.alternatives):
             img = self.generate_matrix(alternative, background_color,
-                                       image_size // 3, line_thickness,
+                                       image_size, line_thickness,
                                        shape_border_thickness)
             img.save(os.path.join(path, puzzle_name + f"_alternative_{i}.png"))
